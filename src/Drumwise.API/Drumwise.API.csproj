@@ -12,10 +12,11 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
   </ItemGroup>
 
+
   <ItemGroup>
     <ProjectReference Include="..\Drumwise.Application\Drumwise.Application.csproj" />
     <ProjectReference Include="..\Drumwise.Contracts\Drumwise.Contracts.csproj" />
-    <ProjectReference Include="..\Drumwise.Infrastructure\Drumwise.Infrastructure.csproj" />
+    <ProjectReference Include="..\Drumwise.DependencyInjection\Drumwise.DependencyInjection.csproj" />
   </ItemGroup>
 
 </Project>
