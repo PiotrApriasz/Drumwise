@@ -11,4 +11,25 @@
       <ProjectReference Include="..\Drumwise.Domain\Drumwise.Domain.csproj" />
     </ItemGroup>
 
+
+
+    <ItemGroup>
+      <PackageReference Include="AutoMapper" Version="12.0.1" />
+      <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+      <PackageReference Include="FluentValidation" Version="11.7.1" />
+      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.7.1" />
+      <PackageReference Include="MediatR" Version="12.1.1" />
+      <PackageReference Include="NLog" Version="5.2.4" />
+      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.4" />
+    </ItemGroup>
+
+
+
+
+
+
+
+
+
+
 </Project>

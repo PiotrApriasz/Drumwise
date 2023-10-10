@@ -7,4 +7,23 @@
         <LangVersion>12</LangVersion>
     </PropertyGroup>
 
+
+
+    <ItemGroup>
+      <PackageReference Include="MediatR" Version="12.1.1" />
+      <PackageReference Include="NLog" Version="5.2.4" />
+      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.4" />
+    </ItemGroup>
+
+
+
+
+    <ItemGroup>
+      <Folder Include="Enums\" />
+      <Folder Include="Exceptions\" />
+      <Folder Include="ValueObjects\" />
+    </ItemGroup>
+
+
+
 </Project>
