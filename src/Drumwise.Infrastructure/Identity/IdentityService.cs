@@ -47,6 +47,8 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         };
 
         var result = await userManager.CreateAsync(user, applicationUserDto.Password);
+        await userManager.AddToRolesAsync(user, new[] { applicationUserDto.Role });
+        
         return (result.ToApplicationResult(), user.Id);
     }
 

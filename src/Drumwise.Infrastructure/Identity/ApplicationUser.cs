@@ -14,5 +14,4 @@ public class ApplicationUser : IdentityUser
     public List<Homework> Homeworks { get; set; } = new List<Homework>();
 
     public List<Lesson> Lessons { get; set; } = new List<Lesson>(); 
-    //TODO Add roles
 }
