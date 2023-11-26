@@ -1,4 +1,4 @@
-using Drumwise.Domain.Common;
+using Drumwise.Application.Common.Models;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

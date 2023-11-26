@@ -1,6 +1,6 @@
 using System.Reflection;
 using Drumwise.Application.Common.Interfaces;
-using Drumwise.Domain.Entities;
+using Drumwise.Application.Entities;
 using Drumwise.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;

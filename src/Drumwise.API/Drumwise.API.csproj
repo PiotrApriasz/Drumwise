@@ -17,7 +17,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Drumwise.Application\Drumwise.Application.csproj" />
-    <ProjectReference Include="..\Drumwise.Contracts\Drumwise.Contracts.csproj" />
     <ProjectReference Include="..\Drumwise.DependencyInjection\Drumwise.DependencyInjection.csproj" />
   </ItemGroup>
 

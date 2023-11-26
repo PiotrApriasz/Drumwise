@@ -1,6 +1,6 @@
 using MediatR;
 
-namespace Drumwise.Domain.Common;
+namespace Drumwise.Application.Common.Models;
 
 public abstract class BaseEvent : INotification
 {

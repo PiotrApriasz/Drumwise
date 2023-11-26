@@ -8,13 +8,13 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Drumwise.Application\Drumwise.Application.csproj" />
-      <ProjectReference Include="..\Drumwise.Infrastructure\Drumwise.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Ardalis.GuardClauses" Version="4.1.1" />
-      <PackageReference Include="NLog" Version="5.2.4" />
-      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.4" />
+      <Folder Include="Homeworks\EventHandlers\" />
+      <Folder Include="Homeworks\Validation\" />
+      <Folder Include="UserRatings\EventHandlers\" />
+      <Folder Include="UserRatings\Validation\" />
     </ItemGroup>
 
 </Project>

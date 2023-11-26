@@ -1,6 +1,6 @@
-using Drumwise.Domain.Constants;
-using Drumwise.Domain.Entities;
+using Drumwise.Application.Entities;
 using Drumwise.Infrastructure.Identity;
+using Drumwise.Infrastructure.Identity.Constants;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

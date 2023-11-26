@@ -1,4 +1,4 @@
-using Drumwise.Domain.Entities;
+using Drumwise.Application.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

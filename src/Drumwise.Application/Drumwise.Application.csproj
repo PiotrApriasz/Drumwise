@@ -7,10 +7,6 @@
         <LangVersion>12</LangVersion>
     </PropertyGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\Drumwise.Domain\Drumwise.Domain.csproj" />
-    </ItemGroup>
-
 
 
     <ItemGroup>
@@ -19,8 +15,15 @@
       <PackageReference Include="FluentValidation" Version="11.7.1" />
       <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.7.1" />
       <PackageReference Include="MediatR" Version="12.1.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
       <PackageReference Include="NLog" Version="5.2.4" />
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.4" />
+    </ItemGroup>
+
+
+
+    <ItemGroup>
+      <Folder Include="ValueObjects\" />
     </ItemGroup>
 
 
