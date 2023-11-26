@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Drumwise.Domain.Common;
+namespace Drumwise.Application.Common.Models;
 
 public abstract class BaseEntity
 {

@@ -6,24 +6,17 @@ using MediatR;
 
 namespace Drumwise.Application.Common.Behaviours;
 
-public class AuthorizationBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : notnull
+public class AuthorizationBehaviour<TRequest, TResponse>(IUser user, IIdentityService identityService)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : notnull
 {
-    private readonly IUser _user;
-    private readonly IIdentityService _identityService;
-
-    public AuthorizationBehaviour(IUser user, IIdentityService identityService)
-    {
-        _user = user;
-        _identityService = identityService;
-    }
-    
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         var authorizeAttributes = request.GetType().GetCustomAttributes<AuthorizeAttribute>().ToList();
 
-        if (authorizeAttributes.Any())
+        if (authorizeAttributes.Count != 0)
         {
-            if (_user.Id is null)
+            if (user.Id is null)
                 throw new UnauthorizedAccessException();
 
             var authorizeAttributesWithRoles = authorizeAttributes
@@ -37,7 +30,7 @@ public class AuthorizationBehaviour<TRequest, TResponse> : IPipelineBehavior<TRe
                 {
                     foreach (var role in roles)
                     {
-                        var isInRole = await _identityService.IsInRoleAsync(_user.Id, role.Trim());
+                        var isInRole = await identityService.IsInRoleAsync(user.Id, role.Trim());
                         if (isInRole)
                         {
                             authorized = true;
@@ -53,11 +46,11 @@ public class AuthorizationBehaviour<TRequest, TResponse> : IPipelineBehavior<TRe
             var authorizeAttributesWithPolicies = authorizeAttributes
                 .Where(a => !string.IsNullOrWhiteSpace(a.Policy)).ToList();
 
-            if (authorizeAttributesWithPolicies.Any())
+            if (authorizeAttributesWithPolicies.Count != 0)
             {
                 foreach (var policy in authorizeAttributesWithPolicies.Select(a => a.Policy))
                 {
-                    var authorized = await _identityService.AuthorizeAsync(_user.Id, policy);
+                    var authorized = await identityService.AuthorizeAsync(user.Id, policy);
 
                     if (!authorized)
                         throw new ForbiddenAccessException();
