@@ -1,6 +1,6 @@
-using Drumwise.Domain.Common;
+using Drumwise.Application.Common.Models;
 
-namespace Drumwise.Domain.Entities;
+namespace Drumwise.Application.Entities;
 
 public class UserRating : BaseAuditableEntity
 {

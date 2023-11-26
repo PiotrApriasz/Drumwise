@@ -1,4 +1,4 @@
-namespace Drumwise.Domain.Common;
+namespace Drumwise.Application.Common;
 
 public abstract class ValueObject
 {

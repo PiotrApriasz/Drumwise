@@ -1,5 +1,5 @@
 using Drumwise.Application.Common.Interfaces;
-using Drumwise.Domain.Common;
+using Drumwise.Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;

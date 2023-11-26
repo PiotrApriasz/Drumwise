@@ -1,4 +1,4 @@
-namespace Drumwise.Domain.Constants;
+namespace Drumwise.Infrastructure.Identity.Constants;
 
 public abstract class Roles
 {

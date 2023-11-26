@@ -4,4 +4,5 @@ public record ApplicationUserDto(string Username,
     string Password,
     string Name,
     string Surname,
-    string Email);
+    string Email,
+    string Role);
