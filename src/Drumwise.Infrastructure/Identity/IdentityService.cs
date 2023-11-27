@@ -36,8 +36,13 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         return result.Succeeded;
     }
 
-    public async Task<(Result Result, string UserId)> CreateUserAsync(ApplicationUserDto applicationUserDto)
+    public async Task<(Result Result, string? UserId)> CreateUserAsync(ApplicationUserDto applicationUserDto)
     {
+        if (await userManager.FindByEmailAsync(applicationUserDto.Email) is not null)
+        {
+            return (Result.Failure(new []{"Email address is in use"}), null);
+        }
+        
         var user = new ApplicationUser()
         {
             UserName = applicationUserDto.Username,

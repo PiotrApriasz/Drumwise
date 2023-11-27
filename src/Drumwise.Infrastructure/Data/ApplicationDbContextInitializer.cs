@@ -1,14 +1,11 @@
 using Drumwise.Application.Entities;
-using Drumwise.Infrastructure.Identity;
-using Drumwise.Infrastructure.Identity.Constants;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Drumwise.Infrastructure.Data;
-using Microsoft.AspNetCore.Builder;
 
-public static class InitializerExtensions
+public static class ApplicationDbInitializerExtensions
 {
     public static async Task InitializeDatabaseAsync(this WebApplication app)
     {
@@ -19,26 +16,13 @@ public static class InitializerExtensions
     }
 }
 
-public class ApplicationDbContextInitializer
+public class ApplicationDbContextInitializer(ApplicationDbContext context)
 {
-    private readonly ApplicationDbContext _context;
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly RoleManager<IdentityRole> _roleManager;
-
-    public ApplicationDbContextInitializer(ApplicationDbContext context,
-        UserManager<ApplicationUser> userManager,
-        RoleManager<IdentityRole> roleManager)
-    {
-        _context = context;
-        _userManager = userManager;
-        _roleManager = roleManager;
-    }
-
     public async Task InitializeAsync()
     {
         try
         {
-            await _context.Database.MigrateAsync();
+            await context.Database.MigrateAsync();
         }
         catch (Exception e)
         {
@@ -49,40 +33,15 @@ public class ApplicationDbContextInitializer
     
     public async Task SeedAsync()
     {
-        // Default roles
-        var roles = new List<IdentityRole>()
-        {
-            new(Roles.Administrator),
-            new(Roles.Student),
-            new(Roles.Teacher)
-        };
-        
-        foreach (var role in roles.Where(role => _roleManager.Roles.All(r => r.Name != role.Name)))
-        {
-            await _roleManager.CreateAsync(role);
-        }
-
-        // Default users
-        var administrator = new ApplicationUser { UserName = "administrator@localhost", Email = "administrator@localhost" };
-
-        if (_userManager.Users.All(u => u.UserName != administrator.UserName))
-        {
-            await _userManager.CreateAsync(administrator, "Administrator1!");
-            if (!string.IsNullOrWhiteSpace(roles[0].Name))
-            {
-                await _userManager.AddToRolesAsync(administrator, new [] { roles[0].Name }!);
-            }
-        }
-
         // Default data
         // Seed, if necessary
         var guidOne = new Guid().ToString();
         var guidTwo = new Guid().ToString();
         var guidThree = new Guid().ToString();
         
-        if (!_context.Lessons.Any())
+        if (!context.Lessons.Any())
         {
-            _context.Lessons.Add(new Lesson
+            context.Lessons.Add(new Lesson
             {
                 Created = DateTime.Now,
                 CreatedBy = guidOne,
@@ -91,13 +50,11 @@ public class ApplicationDbContextInitializer
                 LessonSubject = "Quarter Notes",
                 Exercise = "Play quarter notes for one hour on snare in tempo between 50 and 70"
             });
-            
-            await _context.SaveChangesAsync();
         }
 
-        if (!_context.Homeworks.Any())
+        if (!context.Homeworks.Any())
         {
-            _context.Homeworks.Add(new Homework
+            context.Homeworks.Add(new Homework
             {
                 Created = DateTime.Now,
                 CreatedBy = guidTwo,
@@ -108,13 +65,11 @@ public class ApplicationDbContextInitializer
                 Exercise = "Choose your favourite song and learn it on drums",
                 Deadline = DateTime.Now.AddDays(5)
             });
-            
-            await _context.SaveChangesAsync();
         }
 
-        if (!_context.UserRatings.Any())
+        if (!context.UserRatings.Any())
         {
-            _context.UserRatings.Add(new UserRating
+            context.UserRatings.Add(new UserRating
             {
                 Created = DateTime.Now,
                 CreatedBy = guidThree,
@@ -124,8 +79,9 @@ public class ApplicationDbContextInitializer
                 Comment = "The best teacher",
                 AssignedTo = guidTwo
             });
-            
-            await _context.SaveChangesAsync();
         }
+        
+        await context.SaveChangesAsync();
     }
 }
+

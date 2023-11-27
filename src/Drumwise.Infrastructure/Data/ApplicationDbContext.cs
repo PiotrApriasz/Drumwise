@@ -1,22 +1,17 @@
 using System.Reflection;
 using Drumwise.Application.Common.Interfaces;
 using Drumwise.Application.Entities;
-using Drumwise.Infrastructure.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drumwise.Infrastructure.Data;
 
-public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplicationDbContext
+public class ApplicationDbContext(DbContextOptions<AppIdentityDbContext> options)
+    : DbContext, IApplicationDbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
-
     public DbSet<Homework> Homeworks => Set<Homework>();
-    
     public DbSet<Lesson> Lessons => Set<Lesson>();
-    
     public DbSet<UserRating> UserRatings => Set<UserRating>();
-
+    
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

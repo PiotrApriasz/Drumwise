@@ -1,4 +1,3 @@
-using Drumwise.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 
 namespace Drumwise.Infrastructure.Identity;

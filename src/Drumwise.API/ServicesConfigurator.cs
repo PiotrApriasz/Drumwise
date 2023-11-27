@@ -12,18 +12,41 @@ using MediatR.Pipeline;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
-namespace Drumwise.DependencyInjection;
+namespace Drumwise.API;
 
-public static class ConfigureServices
+public static class ServicesConfigurator
 {
-    public static IServiceCollection AddInfrastructuresServices(this IServiceCollection services, IConfiguration configuration,
-        string csName)
+    public static IServiceCollection ConfigureIdentity(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString(csName);
-        Guard.Against.Null(connectionString, $"Connection string for '{csName}' not found");
+        var connectionString = configuration.GetConnectionString("IdentityConnection");
+        Guard.Against.Null(connectionString, $"Connection string for 'IdentityConnection' not found");
+        
+        services.AddDbContext<AppIdentityDbContext>((sp, options) =>
+        {
+            // Will use mongoDb database with new Entity Framework MongoDb provider
+            //options.UseSqlite(connectionString); 
+        });
+
+        services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppIdentityDbContext>());
+        services.AddScoped<AppIdentityDbContextInitializer>();
+        
+        services.AddIdentity<ApplicationUser, Roles>()
+            .AddRoles<IdentityRole>()
+            .AddEntityFrameworkStores<AppIdentityDbContext>();
+        
+        services.AddTransient<IIdentityService, IdentityService>();
+        
+        services.AddAuthorizationBuilder()
+                    .AddPolicy(Policies.CanAddHomework, policy => policy.RequireRole(Roles.Teacher));
+
+        return services;
+    }
+    
+    public static IServiceCollection AddInfrastructuresServices(this IServiceCollection services, IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("AppConnection");
+        Guard.Against.Null(connectionString, $"Connection string for 'AppConnection' not found");
 
         services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
         services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsInterceptor>();
@@ -36,15 +59,6 @@ public static class ConfigureServices
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<ApplicationDbContextInitializer>();
-
-        services.AddIdentity<ApplicationUser, Roles>()
-            .AddRoles<IdentityRole>()
-            .AddEntityFrameworkStores<ApplicationDbContext>();
-        
-        services.AddTransient<IIdentityService, IdentityService>();
-
-        services.AddAuthorization(options =>
-            options.AddPolicy(Policies.CanAddHomework, policy => policy.RequireRole(Roles.Teacher)));
 
         return services;
     }
