@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Builder;
 
 public static class IdentityDbInitializerExtensions
 {
-    public static async Task InitializeDatabaseAsync(this WebApplication app)
+    public static async Task InitializeIdentityDatabaseAsync(this WebApplication app)
     {
         using var scope = app.Services.CreateScope();
         var initializer = scope.ServiceProvider.GetRequiredService<AppIdentityDbContextInitializer>();
@@ -20,7 +20,7 @@ public static class IdentityDbInitializerExtensions
 }
 
 public class AppIdentityDbContextInitializer(
-    DbContext context,
+    AppIdentityDbContext context,
     UserManager<ApplicationUser> userManager,
     RoleManager<IdentityRole> roleManager)
 {

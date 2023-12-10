@@ -20,20 +20,21 @@ public static class ServicesConfigurator
     public static IServiceCollection ConfigureIdentity(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("IdentityConnection");
-        Guard.Against.Null(connectionString, $"Connection string for 'IdentityConnection' not found");
+        //Guard.Against.Null(connectionString, $"Connection string for 'IdentityConnection' not found");
         
         services.AddDbContext<AppIdentityDbContext>((sp, options) =>
         {
-            // Will use mongoDb database with new Entity Framework MongoDb provider
-            //options.UseSqlite(connectionString); 
+            options.UseSqlite("DataSource=app.db");
         });
-
+        
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppIdentityDbContext>());
         services.AddScoped<AppIdentityDbContextInitializer>();
-        
-        services.AddIdentity<ApplicationUser, Roles>()
+
+        services.AddIdentityApiEndpoints<ApplicationUser>()
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<AppIdentityDbContext>();
+        
+        services.AddAuthorizationBuilder(); 
         
         services.AddTransient<IIdentityService, IdentityService>();
         

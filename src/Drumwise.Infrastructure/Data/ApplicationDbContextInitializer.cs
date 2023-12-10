@@ -7,7 +7,7 @@ namespace Drumwise.Infrastructure.Data;
 
 public static class ApplicationDbInitializerExtensions
 {
-    public static async Task InitializeDatabaseAsync(this WebApplication app)
+    public static async Task InitializeAppDatabaseAsync(this WebApplication app)
     {
         using var scope = app.Services.CreateScope();
         var initializer = scope.ServiceProvider.GetRequiredService<ApplicationDbContextInitializer>();
