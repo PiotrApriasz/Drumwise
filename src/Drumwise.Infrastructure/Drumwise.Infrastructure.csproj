@@ -13,6 +13,7 @@
 
 
     <ItemGroup>
+      <PackageReference Include="MailKit" Version="4.3.0" />
       <PackageReference Include="MediatR" Version="12.1.1" />
       <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="8.0.0" />
       <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.0" />
@@ -25,11 +26,6 @@
       <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
       <PackageReference Include="NLog" Version="5.2.4" />
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.4" />
-    </ItemGroup>
-
-
-    <ItemGroup>
-      <Folder Include="Services\" />
     </ItemGroup>
 
 

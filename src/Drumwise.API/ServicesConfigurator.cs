@@ -2,6 +2,8 @@ using System.Reflection;
 using Ardalis.GuardClauses;
 using Drumwise.Application.Common.Behaviours;
 using Drumwise.Application.Common.Interfaces;
+using Drumwise.Application.Common.Models.Settings;
+using Drumwise.Application.Services;
 using Drumwise.Infrastructure.Data;
 using Drumwise.Infrastructure.Data.Interceptors;
 using Drumwise.Infrastructure.Identity;
@@ -30,13 +32,17 @@ public static class ServicesConfigurator
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppIdentityDbContext>());
         services.AddScoped<AppIdentityDbContextInitializer>();
 
-        services.AddIdentityApiEndpoints<ApplicationUser>()
+        services.AddIdentityApiEndpoints<ApplicationUser>(options =>
+            {
+                options.SignIn.RequireConfirmedEmail = true;
+            })
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<AppIdentityDbContext>();
         
         services.AddAuthorizationBuilder(); 
         
         services.AddTransient<IIdentityService, IdentityService>();
+        services.AddTransient<IEmailSender<ApplicationUser>, IdentityEmailSender>();
         
         services.AddAuthorizationBuilder()
                     .AddPolicy(Policies.CanAddHomework, policy => policy.RequireRole(Roles.Teacher));
@@ -64,7 +70,7 @@ public static class ServicesConfigurator
         return services;
     }
 
-    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
@@ -79,6 +85,10 @@ public static class ServicesConfigurator
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBahaviour<,>));
             cfg.AddBehavior(typeof(IRequestPreProcessor<>), typeof(LoggingBehaviour<>));
         });
+
+        var smtpSettings = configuration.GetSection("SmtpSettings").Get<SmtpSettings>();
+        services.AddTransient<IFileService, FileService>();
+        services.AddSingleton(smtpSettings!);
 
         return services;
     }

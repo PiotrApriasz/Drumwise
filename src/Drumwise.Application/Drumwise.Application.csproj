@@ -28,6 +28,15 @@
 
 
 
+    <ItemGroup>
+      <None Remove="Templates\EmailTemplates\EmailConfirmationTemplate.html" />
+      <EmbeddedResource Include="Templates\EmailTemplates\EmailConfirmationTemplate.html">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+    </ItemGroup>
+
+
+
 
 
 

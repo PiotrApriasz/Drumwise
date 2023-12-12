@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Drumwise.API;
 using Drumwise.Infrastructure.Data;
 using Drumwise.Infrastructure.Identity;
@@ -10,6 +11,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.ConfigureIdentity(builder.Configuration);
+builder.Services.AddApplicationServices(builder.Configuration);
 
 var app = builder.Build();
 

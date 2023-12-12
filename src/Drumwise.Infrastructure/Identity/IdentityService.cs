@@ -1,6 +1,7 @@
 using Drumwise.Application.Common.Interfaces;
 using Drumwise.Application.Common.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,27 +35,6 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
             .AuthorizeAsync(principal, policy);
 
         return result.Succeeded;
-    }
-
-    public async Task<(Result Result, string? UserId)> CreateUserAsync(ApplicationUserDto applicationUserDto)
-    {
-        if (await userManager.FindByEmailAsync(applicationUserDto.Email) is not null)
-        {
-            return (Result.Failure(new []{"Email address is in use"}), null);
-        }
-        
-        var user = new ApplicationUser()
-        {
-            UserName = applicationUserDto.Username,
-            Name = applicationUserDto.Name,
-            Surname = applicationUserDto.Surname,
-            Email = applicationUserDto.Email
-        };
-
-        var result = await userManager.CreateAsync(user, applicationUserDto.Password);
-        await userManager.AddToRolesAsync(user, new[] { applicationUserDto.Role });
-        
-        return (result.ToApplicationResult(), user.Id);
     }
 
     public async Task<Result> DeleteUserAsync(string userId)
