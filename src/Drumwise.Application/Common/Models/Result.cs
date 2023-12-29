@@ -1,23 +1,29 @@
+using Drumwise.Application.Common.Errors;
+
 namespace Drumwise.Application.Common.Models;
 
 public class Result
 {
-    public bool Succeeded { get; init; }
-    public string[] Errors { get; init; }
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public ResultType ResultType { get; set; }
+    public IEnumerable<Error> Errors { get; }
     
-    private Result(bool succeeded, IEnumerable<string> errors)
+    private Result(bool isSuccess, IEnumerable<Error> errors, ResultType resultType)
     {
-        Succeeded = succeeded;
-        Errors = errors.ToArray();
+        if (isSuccess && !Equals(errors, Error.None) ||
+            !isSuccess && Equals(errors, Error.None))
+        {
+            throw new ArgumentException("Invalid error", nameof(errors));
+        }
+
+        IsSuccess = isSuccess;
+        Errors = errors;
+        ResultType = resultType;
     }
 
-    public static Result Success()
-    {
-        return new Result(true, Array.Empty<string>());
-    }
+    public static Result Success(ResultType resultType) => new(true, Error.None, resultType);
 
-    public static Result Failure(IEnumerable<string> errors)
-    {
-        return new Result(false, errors);
-    }
+    public static Result Failure(IEnumerable<Error> errors, ResultType resultType) => 
+        new(false, errors, resultType);
 }
