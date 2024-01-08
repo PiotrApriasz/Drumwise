@@ -56,5 +56,29 @@ namespace Drumwise.Application.Common.Errors {
                 return ResourceManager.GetString("Identity.UserNotFound", resourceCulture);
             }
         }
+        
+        internal static string Identity_SurnameIsRequired {
+            get {
+                return ResourceManager.GetString("Identity.SurnameIsRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Identity_NameIsRequired {
+            get {
+                return ResourceManager.GetString("Identity.NameIsRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Identity_RoleIsRequired {
+            get {
+                return ResourceManager.GetString("Identity.RoleIsRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Identity_UnknownRole {
+            get {
+                return ResourceManager.GetString("Identity.UnknownRole", resourceCulture);
+            }
+        }
     }
 }

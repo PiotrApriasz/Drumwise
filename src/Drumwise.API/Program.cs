@@ -3,6 +3,7 @@ using Drumwise.API.Endpoints;
 using Drumwise.API.ExceptionHandlers;
 using Drumwise.Infrastructure.Data;
 using Drumwise.Infrastructure.Identity;
+using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,12 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.ConfigureIdentity(builder.Configuration);
-builder.Services.AddApplicationServices(builder.Configuration);
-
 builder.Services.AddExceptionHandler<BadHttpRequestExceptionHandler>();
 builder.Services.AddExceptionHandler<ServerExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+builder.Services.ConfigureIdentity(builder.Configuration);
+builder.Services.AddApplicationServices(builder.Configuration);
 
 var app = builder.Build();
 
@@ -34,7 +35,7 @@ app.UseHttpsRedirection();
 app.UseExceptionHandler();
 
 // Map endpoints --------------------------------------------------
-var apiEndpoints = app.MapGroup("/api");
+var apiEndpoints = app.MapGroup("/api").AddFluentValidationAutoValidation();
 
 apiEndpoints.MapIdentityApi<ApplicationUser>();
 apiEndpoints.MapAdditionalIdentityEndpoints();

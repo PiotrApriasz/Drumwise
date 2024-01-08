@@ -24,25 +24,6 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         return user.UserName;
     }
 
-    public async Task<bool> IsInRoleAsync(string userId, string role)
-    {
-        var user = userManager.Users.SingleOrDefault(u => u.Id == userId);
-        return user != null && await userManager.IsInRoleAsync(user, role);
-    }
-
-    public async Task<bool> AuthorizeAsync(string userId, string policy)
-    {
-        var user = userManager.Users.SingleOrDefault(u => u.Id == userId);
-        if (user is null)
-            return false;
-
-        var principal = await userClaimsPrincipalFactory.CreateAsync(user);
-        var result = await authorizationService
-            .AuthorizeAsync(principal, policy);
-
-        return result.Succeeded;
-    }
-
     public async Task<Result> RegisterAdditionalUserData(AdditionalUserDataRequest additionalUserDataRequest, 
         ClaimsPrincipal claimsPrincipal)
     {
@@ -58,6 +39,13 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         if (!result.Succeeded)
         {
             return Result.Failure(IdentityErrors.UpdatingUserError(result.Errors), ResultType.BadRequest);
+        }
+
+        var roleResult = await userManager.AddToRoleAsync(user, additionalUserDataRequest.Role);
+
+        if (!roleResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.AddingUserToRoleError(roleResult.Errors), ResultType.BadRequest);
         }
 
         return Result.Success(ResultType.NoContent);

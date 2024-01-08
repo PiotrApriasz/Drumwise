@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using Ardalis.GuardClauses;
 using Drumwise.Application.Common.Behaviours;
@@ -8,12 +9,18 @@ using Drumwise.Infrastructure.Data;
 using Drumwise.Infrastructure.Data.Interceptors;
 using Drumwise.Infrastructure.Identity;
 using Drumwise.Infrastructure.Identity.Constants;
+using Drumwise.Infrastructure.Identity.Validators;
 using FluentValidation;
+using FluentValidation.Results;
 using MediatR;
 using MediatR.Pipeline;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
+using SharpGrip.FluentValidation.AutoValidation.Endpoints.Results;
+using SharpGrip.FluentValidation.AutoValidation.Shared.Extensions;
 
 namespace Drumwise.API;
 
@@ -34,18 +41,21 @@ public static class ServicesConfigurator
 
         services.AddIdentityApiEndpoints<ApplicationUser>(options =>
             {
-                options.SignIn.RequireConfirmedEmail = true;
+                options.SignIn.RequireConfirmedEmail = false;
             })
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<AppIdentityDbContext>();
+
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy(Policies.CanAddHomework, policy => policy.RequireRole(Roles.Teacher));
+            options.AddPolicy(Policies.RequireTeacherRole, policy => policy.RequireRole(Roles.Teacher));
+        });
         
-        services.AddAuthorizationBuilder(); 
+        services.AddValidatorsFromAssemblyContaining<AdditionalUserDataRequestValidator>();
         
         services.AddTransient<IIdentityService, IdentityService>();
         services.AddTransient<IEmailSender<ApplicationUser>, IdentityEmailSender>();
-        
-        services.AddAuthorizationBuilder()
-                    .AddPolicy(Policies.CanAddHomework, policy => policy.RequireRole(Roles.Teacher));
 
         return services;
     }
@@ -73,16 +83,20 @@ public static class ServicesConfigurator
     public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddAutoMapper(Assembly.GetExecutingAssembly());
-
-        services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+        
+        //services.AddValidatorsFromAssemblyContaining<UserValidator>();
 
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehaviour<,>));
-            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehaviour<,>));
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBahaviour<,>));
             cfg.AddBehavior(typeof(IRequestPreProcessor<>), typeof(LoggingBehaviour<>));
+        });
+        
+        services.AddFluentValidationAutoValidation(config =>
+        {
+            config.OverrideDefaultResultFactoryWith<CustomValidationResultFactory>();
         });
 
         var smtpSettings = configuration.GetSection("SmtpSettings").Get<SmtpSettings>();
@@ -90,5 +104,25 @@ public static class ServicesConfigurator
         services.AddSingleton(smtpSettings!);
 
         return services;
+    }
+    
+    private class CustomValidationResultFactory : IFluentValidationAutoValidationResultFactory
+    {
+        public IResult CreateResult(EndpointFilterInvocationContext context, ValidationResult validationResult)
+        {
+            var validationProblemDetails = new ValidationProblemDetails()
+            {
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                Status = StatusCodes.Status400BadRequest,
+                Title = "One or more validation errors occurred."
+            };
+            
+            foreach (var error in validationResult.Errors)
+            {
+                validationProblemDetails.Errors.Add(error.ErrorCode, [error.ErrorMessage]);
+            }
+
+            return Results.BadRequest(validationProblemDetails);
+        }
     }
 }

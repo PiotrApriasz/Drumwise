@@ -43,7 +43,8 @@ public static class ResultExtensions
         var validationProblemDetails = new ValidationProblemDetails()
         {
             Type = GetErrorType(statusCode),
-            Status = statusCode
+            Status = statusCode,
+            Title = "Error occured while processing request"
         };
 
         foreach (var error in errors)

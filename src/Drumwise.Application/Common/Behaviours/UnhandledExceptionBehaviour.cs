@@ -3,15 +3,9 @@ using NLog;
 
 namespace Drumwise.Application.Common.Behaviours;
 
-public class UnhandledExceptionBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : notnull
+public class UnhandledExceptionBehaviour<TRequest, TResponse>(ILogger logger) : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : notnull
 {
-    private readonly ILogger _logger;
-
-    public UnhandledExceptionBehaviour(ILogger logger)
-    {
-        _logger = logger;
-    }
-
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         try
@@ -22,7 +16,7 @@ public class UnhandledExceptionBehaviour<TRequest, TResponse> : IPipelineBehavio
         {
             const string requestName = nameof(TRequest);
             
-            _logger.Error(e, "Drumwise Request : Unhandled Exception for Request {Name}, {@Request}", 
+            logger.Error(e, "Drumwise Request : Unhandled Exception for Request {Name}, {@Request}", 
                 requestName, request);
 
             throw;

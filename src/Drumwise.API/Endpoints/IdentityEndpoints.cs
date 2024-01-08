@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Drumwise.Application.Common.Extensions;
 using Drumwise.Application.Common.Interfaces;
 using Drumwise.Application.Common.Models.Identity;
+using Drumwise.Infrastructure.Identity.Constants;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Drumwise.API.Endpoints;

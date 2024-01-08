@@ -10,4 +10,7 @@ public static class IdentityErrors
 
     public static IEnumerable<Error> UpdatingUserError(IEnumerable<IdentityError> errors) =>
         Error.IdentityError(errors);
+
+    public static IEnumerable<Error> AddingUserToRoleError(IEnumerable<IdentityError> errors) =>
+        Error.IdentityError(errors);
 }

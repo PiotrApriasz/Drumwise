@@ -7,7 +7,7 @@ public class BadHttpRequestExceptionHandler : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        if (exception is not BadHttpRequestException) return true;
+        if (exception is not BadHttpRequestException) return false;
         
         var problemDetails = new ProblemDetails()
         {

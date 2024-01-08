@@ -24,4 +24,16 @@
     <data name="Identity.UserNotFound" xml:space="preserve">
         <value>User couldn't be found with provided data</value>
     </data>
+    <data name="Identity.SurnameIsRequired" xml:space="preserve">
+        <value>Surname value must be provided</value>
+    </data>
+    <data name="Identity.NameIsRequired" xml:space="preserve">
+        <value>Name value must be provided</value>
+    </data>
+    <data name="Identity.RoleIsRequired" xml:space="preserve">
+        <value>Role for the user must be provided</value>
+    </data>
+    <data name="Identity.UnknownRole" xml:space="preserve">
+        <value>Provided role is not available</value>
+    </data>
 </root>
