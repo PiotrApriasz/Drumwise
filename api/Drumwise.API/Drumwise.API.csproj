@@ -24,6 +24,9 @@
 
 
   <ItemGroup>
+    <ProjectReference Include="..\..\core\Drumwise.Application\Drumwise.Application.csproj" />
+    <ProjectReference Include="..\..\core\Drumwise.Features\Drumwise.Features.csproj" />
+    <ProjectReference Include="..\..\core\Drumwise.Infrastructure\Drumwise.Infrastructure.csproj" />
     <ProjectReference Include="..\Drumwise.Application\Drumwise.Application.csproj" />
     <ProjectReference Include="..\Drumwise.Features\Drumwise.Features.csproj" />
     <ProjectReference Include="..\Drumwise.Infrastructure\Drumwise.Infrastructure.csproj" />
