@@ -6,15 +6,8 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Drumwise.Infrastructure.Data.Interceptors;
 
-public class AuditableEntityInterceptor : SaveChangesInterceptor
+public class AuditableEntityInterceptor(IUser user) : SaveChangesInterceptor
 {
-    private readonly IUser _user;
-
-    public AuditableEntityInterceptor(IUser user)
-    {
-        _user = user;
-    }
-
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
         UpdateEntities(eventData.Context);
@@ -37,13 +30,13 @@ public class AuditableEntityInterceptor : SaveChangesInterceptor
         {
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.CreatedBy = _user.Id;
+                entry.Entity.CreatedBy = user.Id;
                 entry.Entity.Created = DateTime.Now;
             }
             
             if (entry.State == EntityState.Added || entry.State == EntityState.Modified || entry.HasChangedOwnedEntities())
             {
-                entry.Entity.LastModifiedBy = _user.Id;
+                entry.Entity.LastModifiedBy = user.Id;
                 entry.Entity.LastModified = DateTime.Now;
             }
         }

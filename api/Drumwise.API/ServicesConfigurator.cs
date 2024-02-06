@@ -31,6 +31,9 @@ public static class ServicesConfigurator
         var connectionString = configuration.GetConnectionString("IdentityConnection");
         //Guard.Against.Null(connectionString, $"Connection string for 'IdentityConnection' not found");
         
+        services.AddScoped<IUser, CurrentUser>();
+        services.AddHttpContextAccessor();
+        
         services.AddDbContext<AppIdentityDbContext>((sp, options) =>
         {
             options.UseSqlite("DataSource=app.db");
