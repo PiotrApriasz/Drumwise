@@ -7,12 +7,15 @@ using NLog;
 using NLog.Web;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
 
-var logger = NLog.LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
+var logger = LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
 logger.Debug("Api init");
 
 try
 {
     var builder = WebApplication.CreateBuilder(args);
+    
+    builder.Logging.ClearProviders();
+    builder.Host.UseNLog();
 
     // Add services to the container.
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -49,6 +52,8 @@ try
     // ----------------------------------------------------------------
 
     app.Run();
+
+    throw new Exception("DUUUPPAPAPAP");
 }
 catch(Exception exception)
 {
