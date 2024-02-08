@@ -4,7 +4,7 @@ namespace Drumwise.Application.Common.Models;
 
 public abstract class BaseEntity
 {
-    public string Id { get; set; }
+    public Guid Id { get; set; }
 
     private readonly List<BaseEvent> _domainEvents = new();
 

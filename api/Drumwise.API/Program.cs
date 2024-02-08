@@ -28,6 +28,7 @@ try
 
     builder.Services.ConfigureIdentity(builder.Configuration);
     builder.Services.AddApplicationServices(builder.Configuration);
+    builder.Services.AddInfrastructuresServices(builder.Configuration);
 
     var app = builder.Build();
 
@@ -38,6 +39,7 @@ try
         app.UseSwaggerUI();
 
         await app.InitializeIdentityDatabaseAsync();
+        await app.InitializeAppDatabaseAsync();
     }
 
     app.UseHttpsRedirection();
@@ -52,8 +54,6 @@ try
     // ----------------------------------------------------------------
 
     app.Run();
-
-    throw new Exception("DUUUPPAPAPAP");
 }
 catch(Exception exception)
 {

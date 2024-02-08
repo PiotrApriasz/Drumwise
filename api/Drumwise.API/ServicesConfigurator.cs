@@ -66,7 +66,7 @@ public static class ServicesConfigurator
     public static IServiceCollection AddInfrastructuresServices(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("AppConnection");
-        Guard.Against.Null(connectionString, $"Connection string for 'AppConnection' not found");
+        //Guard.Against.Null(connectionString, $"Connection string for 'AppConnection' not found");
 
         services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
         services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsInterceptor>();
@@ -74,7 +74,7 @@ public static class ServicesConfigurator
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
             options.AddInterceptors(sp.GetService<ISaveChangesInterceptor>()!);
-            options.UseSqlite(connectionString);
+            options.UseSqlite("DataSource=main.db");
         });
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());

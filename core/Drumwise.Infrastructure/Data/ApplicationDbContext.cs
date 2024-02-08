@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Drumwise.Infrastructure.Data;
 
-public class ApplicationDbContext(DbContextOptions<AppIdentityDbContext> options)
-    : DbContext, IApplicationDbContext
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    : DbContext(options), IApplicationDbContext
 {
     public DbSet<Homework> Homeworks => Set<Homework>();
     public DbSet<Lesson> Lessons => Set<Lesson>();
