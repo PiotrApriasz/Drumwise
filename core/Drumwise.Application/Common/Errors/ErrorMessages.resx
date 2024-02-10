@@ -36,4 +36,13 @@
     <data name="Identity.UnknownRole" xml:space="preserve">
         <value>Provided role is not available</value>
     </data>
+    <data name="Homework.TitleIsRequired" xml:space="preserve">
+        <value>Homework title must be provided</value>
+    </data>
+    <data name="Homework.ToLittleDeadline" xml:space="preserve">
+        <value>Deadline must be more than one day later from homework creation</value>
+    </data>
+    <data name="Homework.AssignedToIsRequired" xml:space="preserve">
+        <value>Homework must be assigned to specific user</value>
+    </data>
 </root>

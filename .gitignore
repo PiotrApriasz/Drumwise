@@ -238,6 +238,8 @@ ClientBin/
 *.jfm
 *.pfx
 *.publishsettings
+api/Drumwise.API/app.db
+api/Drumwise.API/main.db
 orleans.codegen.cs
 
 # Including strong name files can present a security risk

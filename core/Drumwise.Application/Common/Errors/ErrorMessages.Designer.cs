@@ -80,5 +80,23 @@ namespace Drumwise.Application.Common.Errors {
                 return ResourceManager.GetString("Identity.UnknownRole", resourceCulture);
             }
         }
+        
+        internal static string Homework_TitleIsRequired {
+            get {
+                return ResourceManager.GetString("Homework.TitleIsRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Homework_ToLittleDeadline {
+            get {
+                return ResourceManager.GetString("Homework.ToLittleDeadline", resourceCulture);
+            }
+        }
+        
+        internal static string Homework_AssignedToIsRequired {
+            get {
+                return ResourceManager.GetString("Homework.AssignedToIsRequired", resourceCulture);
+            }
+        }
     }
 }

@@ -5,6 +5,8 @@ using Drumwise.Application.Common.Behaviours;
 using Drumwise.Application.Common.Interfaces;
 using Drumwise.Application.Common.Models.Settings;
 using Drumwise.Application.Services;
+using Drumwise.Features.Homeworks;
+using Drumwise.Features.Homeworks.Validation;
 using Drumwise.Infrastructure.Data;
 using Drumwise.Infrastructure.Data.Interceptors;
 using Drumwise.Infrastructure.Identity;
@@ -73,9 +75,11 @@ public static class ServicesConfigurator
 
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
-            options.AddInterceptors(sp.GetService<ISaveChangesInterceptor>()!);
+            options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>()!);
             options.UseSqlite("DataSource=main.db");
         });
+        
+        services.AddValidatorsFromAssemblyContaining<CreateHomeworkCommandValidator>();
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<ApplicationDbContextInitializer>();
@@ -86,12 +90,10 @@ public static class ServicesConfigurator
     public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddAutoMapper(Assembly.GetExecutingAssembly());
-        
-        //services.AddValidatorsFromAssemblyContaining<UserValidator>();
 
         services.AddMediatR(cfg =>
         {
-            cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
+            cfg.RegisterServicesFromAssemblyContaining<CreateHomeworkHandler>();
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehaviour<,>));
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBahaviour<,>));
             cfg.AddBehavior(typeof(IRequestPreProcessor<>), typeof(LoggingBehaviour<>));

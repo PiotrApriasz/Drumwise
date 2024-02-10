@@ -51,6 +51,7 @@ try
 
     apiEndpoints.MapIdentityApi<ApplicationUser>();
     apiEndpoints.MapAdditionalIdentityEndpoints();
+    apiEndpoints.MapHomeworkEndpoints();
     // ----------------------------------------------------------------
 
     app.Run();

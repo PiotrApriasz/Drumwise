@@ -11,4 +11,11 @@ public static class ErrorCodes
         public const string RoleIsRequired = "Identity.RoleIsRequired";
         public const string UnknownRole = "Identity.UnknownRole";
     }
+
+    public static class Homework
+    {
+        public const string TitleIsRequired = "Homework.TitleIsRequired";
+        public const string ToLittleDeadline = "Homework.ToLittleDeadline";
+        public const string AssignedToIsRequired = "Homework.AssignedToIsRequired";
+    }
 }

@@ -8,11 +8,13 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Drumwise.Application\Drumwise.Application.csproj" />
+      <ProjectReference Include="..\Drumwise.Infrastructure\Drumwise.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Homeworks\EventHandlers\" />
-      <Folder Include="Homeworks\Validation\" />
+      <Folder Include="Lessons\EventHandlers\" />
+      <Folder Include="Lessons\Events\" />
+      <Folder Include="Lessons\Validation\" />
       <Folder Include="UserRatings\EventHandlers\" />
       <Folder Include="UserRatings\Validation\" />
     </ItemGroup>
