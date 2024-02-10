@@ -4,10 +4,12 @@ using NLog;
 
 namespace Drumwise.Application.Common.Behaviours;
 
-public class LoggingBehaviour<TRequest>(ILogger logger, IUser user, IIdentityService identityService)
+public class LoggingBehaviour<TRequest>(IUser user, IIdentityService identityService)
     : IRequestPreProcessor<TRequest>
     where TRequest : notnull
 {
+    private readonly ILogger _logger = LogManager.GetCurrentClassLogger();
+    
     public async Task Process(TRequest request, CancellationToken cancellationToken)
     {
         const string requestName = nameof(TRequest);
@@ -17,7 +19,7 @@ public class LoggingBehaviour<TRequest>(ILogger logger, IUser user, IIdentitySer
         if (!string.IsNullOrEmpty(userId))
             username = await identityService.GetUserNameAsync(userId);
         
-        logger.Info("Drumwise Request: {Name}, {@UserId}, {@Username}, {@Request}", 
+        _logger.Info("Drumwise Request: {Name}, {@UserId}, {@Username}, {@Request}", 
             requestName, userId, username, request);
     }
 }

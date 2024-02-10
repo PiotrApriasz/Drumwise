@@ -6,17 +6,14 @@ using NLog;
 
 namespace Drumwise.Application.Common.Behaviours;
 
-public class PerformanceBahaviour<TRequest, TResponse>(
-    Stopwatch timer,
-    ILogger logger,
-    IUser user,
-    IIdentityService identityService)
-    : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+public class PerformanceBahaviour<TRequest, TResponse>(IUser user, IIdentityService identityService)
+    : IPipelineBehavior<TRequest, TResponse> where TRequest : notnull
 {
+    private readonly ILogger _logger = LogManager.GetCurrentClassLogger();
+    
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
-        timer.Start();
+        var timer  = Stopwatch.StartNew();
 
         var response = await next();
 
@@ -35,7 +32,7 @@ public class PerformanceBahaviour<TRequest, TResponse>(
                 userName = await identityService.GetUserNameAsync(userId);
             }
 
-            logger.Warn("Drumwise Long Running Request: {Name} ({ElapsedMilliseconds} milliseconds), {@UserId}, {@UserName}, {@Request}",
+            _logger.Warn("Drumwise Long Running Request: {Name} ({ElapsedMilliseconds} milliseconds), {@UserId}, {@UserName}, {@Request}",
                 requestName, elapsedMilliseconds, userId, userName, request);
         }
 
