@@ -11,6 +11,20 @@ public static class IdentityEndpoints
 {
     public static void MapAdditionalIdentityEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapPost("/customRegister", async Task<IResult> (
+            [FromBody] UserRegisterDataRequest userRegisterDataRequest,
+            [FromServices] IIdentityService identityService,
+            HttpContext context) =>
+        {
+            var result = await identityService
+                .CustomUserRegister(userRegisterDataRequest, context)
+                .ConfigureAwait(false);
+            
+            return result.Match(
+                onSuccess: result.ProduceSuccessApiResponse(),
+                onFailure: result.ProduceErrorApiResponse());
+        });
+            
         var manageGroup = endpoints.MapGroup("/manage").RequireAuthorization();
         
         manageGroup.MapPost("/addAdditionalUserData",  async Task<IResult>
@@ -18,7 +32,8 @@ public static class IdentityEndpoints
                     [FromServices] IIdentityService identityService) =>
             {
                 var result = await identityService
-                    .RegisterAdditionalUserData(additionalUserDataRequest, claimsPrincipal);
+                    .RegisterAdditionalUserData(additionalUserDataRequest, claimsPrincipal)
+                    .ConfigureAwait(false);
 
                 return result.Match(
                     onSuccess: result.ProduceSuccessApiResponse(),
@@ -27,5 +42,7 @@ public static class IdentityEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem()
             .ProducesValidationProblem(StatusCodes.Status404NotFound);
+        
+        
     }
 }

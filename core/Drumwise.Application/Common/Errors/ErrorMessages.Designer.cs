@@ -98,5 +98,11 @@ namespace Drumwise.Application.Common.Errors {
                 return ResourceManager.GetString("Homework.AssignedToIsRequired", resourceCulture);
             }
         }
+        
+        internal static string Identity_InvalidEmail {
+            get {
+                return ResourceManager.GetString("Identity.InvalidEmail", resourceCulture);
+            }
+        }
     }
 }

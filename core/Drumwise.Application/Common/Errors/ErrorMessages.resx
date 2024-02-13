@@ -45,4 +45,7 @@
     <data name="Homework.AssignedToIsRequired" xml:space="preserve">
         <value>Homework must be assigned to specific user</value>
     </data>
+    <data name="Identity.InvalidEmail" xml:space="preserve">
+        <value>{0} email is incorrect</value>
+    </data>
 </root>

@@ -20,9 +20,9 @@ public class Error
     
     public static IEnumerable<Error> None => Enumerable.Empty<Error>();
 
-    public static IEnumerable<Error> ApplicationError(IEnumerable<string> errorCodes) => 
+    public static IEnumerable<Error> ApplicationError(IEnumerable<string> errorCodes, params object?[] additionalDescriptionElements) => 
         errorCodes
-            .Select(errorCode => new Error { Code = errorCode, Description = GetErrorMessage(errorCode) })
+            .Select(errorCode => new Error { Code = errorCode, Description = string.Format(GetErrorMessage(errorCode), additionalDescriptionElements) })
             .ToList();
 
     public static IEnumerable<Error> IdentityError(IEnumerable<IdentityError> identityErrors) =>

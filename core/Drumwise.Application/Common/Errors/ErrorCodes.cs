@@ -10,6 +10,7 @@ public static class ErrorCodes
         public const string SurnameIsRequired = "Identity.SurnameIsRequired";
         public const string RoleIsRequired = "Identity.RoleIsRequired";
         public const string UnknownRole = "Identity.UnknownRole";
+        public const string InvalidEmail = "Identity.InvalidEmail";
     }
 
     public static class Homework
