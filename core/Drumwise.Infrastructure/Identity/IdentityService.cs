@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
+using Drumwise.Application.Common.Constants;
 using Drumwise.Application.Common.Errors;
 using Drumwise.Application.Common.Exceptions;
 using Drumwise.Application.Common.Interfaces;
@@ -15,25 +16,39 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using NLog;
 using ValidationException = FluentValidation.ValidationException;
 
 namespace Drumwise.Infrastructure.Identity;
 
 public class IdentityService(UserManager<ApplicationUser> userManager,
-        IUserClaimsPrincipalFactory<ApplicationUser> userClaimsPrincipalFactory,
-        IAuthorizationService authorizationService,
         IUserStore<ApplicationUser> userStore,
         IEmailSender<ApplicationUser> emailSender,
         LinkGenerator linkGenerator)
     : IIdentityService
 {
     private static readonly EmailAddressAttribute EmailAddressAttribute = new();
+    private static readonly ILogger Logger = LogManager.GetCurrentClassLogger();
     
     public  async Task<string?> GetUserNameAsync(string userId)
     {
-        var user = await userManager.Users.FirstAsync(u => u.Id == userId);
-        return user.UserName;
+        var applicationUser = await GetUsernameById(userId);
+        return applicationUser?.UserName;
     }
+
+    public async Task<string?> GetUserFullNameIfAvailable(string userId)
+    {
+        var applicationUser = await GetUsernameById(userId);
+
+        if (applicationUser is null)
+            return null;
+
+        var name = applicationUser.Name;
+        var surname = applicationUser.Surname;
+
+        return $"{name} {surname}";
+    }
+    
 
     // Clients should use that endpoint instead of register endpoint from ASP .NET
     // Identity API endpoint. I implemented that because clients have to call email
@@ -45,9 +60,9 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
     public async Task<Result> CustomUserRegister(UserRegisterDataRequest userRegisterDataRequest, 
         HttpContext context)
     {
-        // TODO: Implement validation and sanitization of clientEmailConfirmationUrl
+        Logger.Info("Registering new user");
         
-        var clientEmailConfirmationUrl = context.Request.Headers["X-Client-URL"].FirstOrDefault();
+        var clientUrl = context.Items["ClientAddress"]!.ToString()!;
         
         var email = userRegisterDataRequest.Email;
 
@@ -68,7 +83,7 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
             return Result.Failure(IdentityErrors.IdentityError(result.Errors), ResultType.BadRequest);
         }
 
-        await SendConfirmationEmailAsync(user, email, clientEmailConfirmationUrl!);
+        await SendConfirmationEmailAsync(user, email, clientUrl);
         
         return Result.Success(ResultType.NoContent);
     }
@@ -106,6 +121,12 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         return user != null ? await PerformDeleteUser(user) : Result.Success(ResultType.Ok);
     }
 
+    private async Task<ApplicationUser?> GetUsernameById(string id)
+    {
+        var user = await userManager.Users.FirstOrDefaultAsync(u => u.Id == id);
+        return user;
+    }
+
     private async Task<Result> PerformDeleteUser(ApplicationUser user)
     {
         var result = await userManager.DeleteAsync(user);
@@ -117,6 +138,7 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         var code = isChange
             ? await userManager.GenerateChangeEmailTokenAsync(user, email)
             : await userManager.GenerateEmailConfirmationTokenAsync(user);
+        
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
         var userId = await userManager.GetUserIdAsync(user);
@@ -127,12 +149,11 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         };
 
         if (isChange)
-        {
-            // This is validated by the /confirmEmail endpoint on change.
             routeValues.Add("changedEmail", email);
-        }
 
-        var confirmEmailUrl = QueryHelpers.AddQueryString(url, 
+        var confirmEmailUrl = $"{url}/{CommonClientRoutes.ConfirmEmailRoute}";
+
+        confirmEmailUrl = QueryHelpers.AddQueryString(confirmEmailUrl, 
             routeValues.ToDictionary(k => k.Key, k => k.Value!.ToString()));
 
         await emailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(confirmEmailUrl));

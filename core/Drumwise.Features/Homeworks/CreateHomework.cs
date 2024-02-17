@@ -4,6 +4,7 @@ using Drumwise.Application.Entities;
 using Drumwise.Features.Homeworks.Events;
 using Drumwise.Infrastructure.Data;
 using MediatR;
+using Microsoft.AspNetCore.Http;
 
 namespace Drumwise.Features.Homeworks;
 
@@ -12,10 +13,13 @@ public record CreateHomeworkCommand(string AssignedTo,
                                     string Exercise,
                                     DateTime Deadline) : IRequest<(Result, Guid)>;
 
-public class CreateHomeworkHandler(ApplicationDbContext context) : IRequestHandler<CreateHomeworkCommand, (Result, Guid)>
+public class CreateHomeworkHandler(ApplicationDbContext context, IHttpContextAccessor httpContextAccessor) 
+    : IRequestHandler<CreateHomeworkCommand, (Result, Guid)>
 {
     public async Task<(Result, Guid)> Handle(CreateHomeworkCommand request, CancellationToken cancellationToken)
     {
+        var clientUrl = httpContextAccessor.HttpContext!.Items["ClientAddress"]!.ToString()!;
+        
         var entity = new Homework()
         {
             AssignedTo = request.AssignedTo,
@@ -24,10 +28,9 @@ public class CreateHomeworkHandler(ApplicationDbContext context) : IRequestHandl
             Deadline = request.Deadline
         };
         
-        entity.AddDomainEvent(new HomeworkCreatedEvent(entity));
+        entity.AddDomainEvent(new HomeworkCreatedEvent(entity, clientUrl));
 
         context.Homeworks.Add(entity);
-
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return (Result.Success(ResultType.Ok), entity.Id);

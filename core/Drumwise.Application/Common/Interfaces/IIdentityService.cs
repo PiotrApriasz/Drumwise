@@ -9,6 +9,8 @@ public interface IIdentityService
 {
     Task<string?> GetUserNameAsync(string userId);
 
+    Task<string?> GetUserFullNameIfAvailable(string userId);
+
     Task<Result> CustomUserRegister(UserRegisterDataRequest userRegisterDataRequest,
         HttpContext context);
 
