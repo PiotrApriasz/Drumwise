@@ -106,6 +106,7 @@ public static class ServicesConfigurator
 
         var smtpSettings = configuration.GetSection("SmtpSettings").Get<SmtpSettings>();
         services.AddTransient<IFileService, FileService>();
+        services.AddTransient<IMailSender, MailSender>();
         services.AddSingleton(smtpSettings!);
 
         return services;

@@ -1,6 +1,7 @@
 using Drumwise.API;
 using Drumwise.API.Endpoints;
 using Drumwise.API.ExceptionHandlers;
+using Drumwise.API.Middleware;
 using Drumwise.Infrastructure.Data;
 using Drumwise.Infrastructure.Identity;
 using NLog;
@@ -30,6 +31,8 @@ try
     builder.Services.AddApplicationServices(builder.Configuration);
     builder.Services.AddInfrastructuresServices(builder.Configuration);
 
+    builder.Services.AddTransient<ClientApiKeyAuthenticationMiddleware>();
+
     var app = builder.Build();
 
     // Configure the HTTP request pipeline.
@@ -45,6 +48,8 @@ try
     app.UseHttpsRedirection();
 
     app.UseExceptionHandler();
+    
+    app.UseMiddleware<ClientApiKeyAuthenticationMiddleware>();
 
     // Map endpoints --------------------------------------------------
     var apiEndpoints = app.MapGroup("/api").AddFluentValidationAutoValidation();
