@@ -3,6 +3,7 @@ using System.Reflection;
 using Ardalis.GuardClauses;
 using Drumwise.Application.Common.Behaviours;
 using Drumwise.Application.Common.Interfaces;
+using Drumwise.Application.Common.Mappings;
 using Drumwise.Application.Common.Models.Settings;
 using Drumwise.Application.Services;
 using Drumwise.Features.Homeworks;
@@ -89,7 +90,12 @@ public static class ServicesConfigurator
 
     public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddAutoMapper(Assembly.GetExecutingAssembly());
+        var typeWithMapFromInterface = typeof(HomeworkItemBriefDto);
+
+        services.AddAutoMapper(cfg =>
+        {
+            cfg.AddProfile<MappingProfile>();
+        }, typeWithMapFromInterface.Assembly);
 
         services.AddMediatR(cfg =>
         {

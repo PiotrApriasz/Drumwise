@@ -7,6 +7,7 @@ public class PaginatedList<T>(List<T> items, int pageNumber, int pageSize, int t
     public List<T> Items { get; } = items;
     public int PageNumber { get; } = pageNumber;
     public int TotalPages { get; } = (int)Math.Ceiling(totalCount / (double)pageSize);
+    
     public int TotalCount { get; } = totalCount;
 
     public bool HasPreviousPage => PageNumber > 1;
@@ -18,6 +19,6 @@ public class PaginatedList<T>(List<T> items, int pageNumber, int pageSize, int t
         var count = await source.CountAsync();
         var items = await source.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
 
-        return new PaginatedList<T>(items, count, pageNumber, pageSize);
+        return new PaginatedList<T>(items, pageNumber, pageSize, count);
     }
 }

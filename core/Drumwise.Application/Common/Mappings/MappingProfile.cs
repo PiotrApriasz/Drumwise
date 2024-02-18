@@ -7,7 +7,7 @@ public class MappingProfile : Profile
 {
     public MappingProfile()
     {
-        ApplyMappingsFromAssembly(Assembly.GetExecutingAssembly());
+        ApplyMappingsFromAssembly(Assembly.Load("Drumwise.Features"));
     }
     
     private void ApplyMappingsFromAssembly(Assembly assembly)
@@ -25,7 +25,6 @@ public class MappingProfile : Profile
                              ?? type.GetInterface("IMapFrom`1")!.GetMethod("Mapping");
 
             methodInfo?.Invoke(instance, new object[] { this });
-
         }
     }
 }
