@@ -18,6 +18,7 @@ public class CreateHomeworkHandler(ApplicationDbContext context, IHttpContextAcc
 {
     public async Task<(Result, Guid)> Handle(CreateHomeworkCommand request, CancellationToken cancellationToken)
     {
+        // TODO: Implement adding attachments to homework (PDFs, videos, etc.) (add ResultNeeded property)
         var clientUrl = httpContextAccessor.HttpContext!.Items["ClientAddress"]!.ToString()!;
         
         var entity = new Homework()

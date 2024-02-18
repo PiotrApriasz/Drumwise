@@ -19,10 +19,8 @@ public static class IdentityEndpoints
             var result = await identityService
                 .CustomUserRegister(userRegisterDataRequest, context)
                 .ConfigureAwait(false);
-            
-            return result.Match(
-                onSuccess: result.ProduceSuccessApiResponse(),
-                onFailure: result.ProduceErrorApiResponse());
+
+            return result.ProduceApiResponse();
         });
             
         var manageGroup = endpoints.MapGroup("/manage").RequireAuthorization();
@@ -35,9 +33,7 @@ public static class IdentityEndpoints
                     .RegisterAdditionalUserData(additionalUserDataRequest, claimsPrincipal)
                     .ConfigureAwait(false);
 
-                return result.Match(
-                    onSuccess: result.ProduceSuccessApiResponse(),
-                    onFailure: result.ProduceErrorApiResponse());
+                return result.ProduceApiResponse();
             })
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem()

@@ -16,13 +16,20 @@ public static class HomeworkEndpoints
         homeworkGroup.MapPost("/",  async Task<IResult>
             ([FromBody] CreateHomeworkCommand createHomeworkCommand, [FromServices]ISender sender) =>
             {
-                var result = await sender.Send(createHomeworkCommand).ConfigureAwait(false);
-                
-                return result.Item1.Match(
-                    onSuccess: result.Item1.ProduceSuccessApiResponse(result.Item2),
-                    onFailure: result.Item1.ProduceErrorApiResponse());
+                var (result, homeworkId) = await sender.Send(createHomeworkCommand).ConfigureAwait(false);
+
+                return result.ProduceApiResponse(homeworkId);
             })
             .RequireAuthorization("CanAddHomework")
             .Produces<Guid>();
+
+        homeworkGroup.MapGet("/", async Task<IResult>
+            ([AsParameters] GetHomeworksWithPaginationQuery query, [FromServices] ISender sender) =>
+        {
+            var (result, homeworks) = await sender.Send(query).ConfigureAwait(false);
+
+            return result.ProduceApiResponse(homeworks);
+        })
+        .Produces<HomeworkItemBriefDto>();
     }
 }

@@ -7,32 +7,34 @@ namespace Drumwise.Application.Common.Extensions;
 
 public static class ResultExtensions
 {
-    public static T Match<T>(this Result result, Func<T> onSuccess, Func<T> onFailure)
+    public static IResult ProduceApiResponse(this Result result, object? resultData = null)
     {
-        return result.IsSuccess ? onSuccess() : onFailure();
+        return result.IsSuccess
+            ? result.ProduceSuccessApiResponse(resultData)
+            : result.ProduceErrorApiResponse();
     }
 
-    public static Func<IResult> ProduceErrorApiResponse(this Result result)
+    public static IResult ProduceErrorApiResponse(this Result result)
     {
         return result.ResultType switch
         {
-            ResultType.BadRequest => () =>
+            ResultType.BadRequest =>
                 TypedResults.BadRequest(CreateProblemResponse(result.Errors,
                     StatusCodes.Status400BadRequest)),
-            ResultType.NotFound => () => TypedResults.NotFound(CreateProblemResponse(result.Errors,
+            ResultType.NotFound => TypedResults.NotFound(CreateProblemResponse(result.Errors,
                 StatusCodes.Status404NotFound)),
-            _ => () => TypedResults.Problem("Unsupported result type value", 
+            _ => TypedResults.Problem("Unsupported result type value", 
                 statusCode: StatusCodes.Status500InternalServerError)
         };
     }
 
-    public static Func<IResult> ProduceSuccessApiResponse(this Result result, object? resultData = null)
+    public static IResult ProduceSuccessApiResponse(this Result result, object? resultData)
     {
         return result.ResultType switch
         {
-            ResultType.Ok => () => TypedResults.Ok(resultData),
-            ResultType.NoContent => TypedResults.NoContent,
-            _ => () => TypedResults.Problem("Unsupported result type value", 
+            ResultType.Ok => TypedResults.Ok(resultData),
+            ResultType.NoContent => TypedResults.NoContent(),
+            _ => TypedResults.Problem("Unsupported result type value", 
                 statusCode: StatusCodes.Status500InternalServerError)
         };
     }
