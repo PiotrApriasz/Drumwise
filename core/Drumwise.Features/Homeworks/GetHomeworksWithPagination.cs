@@ -1,28 +1,30 @@
 using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using Drumwise.Application.Common.Errors;
+using Drumwise.Application.Common.Interfaces;
 using Drumwise.Application.Common.Mappings;
 using Drumwise.Application.Common.Models;
 using Drumwise.Application.Entities;
 using Drumwise.Infrastructure.Data;
+using Drumwise.Infrastructure.Identity.Constants;
 using MediatR;
 
 namespace Drumwise.Features.Homeworks;
 
-public record GetHomeworksWithPaginationQuery(
-    string UserId,
-    bool IfTeacher,
-    int PageNumber,
-    int PageSize) : IRequest<(Result, PaginatedList<HomeworkItemBriefDto>)>;
+public record GetHomeworksWithPaginationQuery(int PageNumber, int PageSize) 
+    : IRequest<(Result, PaginatedList<HomeworkItemBriefDto>)>;
 
-public class GetHomeworksWithPaginationHandler(ApplicationDbContext context, IMapper mapper) 
+public class GetHomeworksWithPaginationHandler(ApplicationDbContext context, IMapper mapper, IUser user) 
     : IRequestHandler<GetHomeworksWithPaginationQuery, (Result, PaginatedList<HomeworkItemBriefDto>)>
 {
     public async Task<(Result, PaginatedList<HomeworkItemBriefDto>)> Handle(GetHomeworksWithPaginationQuery request, CancellationToken cancellationToken)
     {
-        var homeworksRaw = request.IfTeacher
-            ? context.Homeworks.Where(x => x.CreatedBy == request.UserId)
-            : context.Homeworks.Where(x => x.AssignedTo == request.UserId);
+        var loggedUser = user.Id;
+        var ifTeacher = await user.IsInRoleAsync(Roles.Teacher);
+        
+        var homeworksRaw = ifTeacher
+            ? context.Homeworks.Where(x => x.CreatedBy == loggedUser)
+            : context.Homeworks.Where(x => x.AssignedTo == loggedUser);
             
         var homeworks = await homeworksRaw
             .OrderByDescending(x => x.Deadline)
