@@ -4,7 +4,7 @@ public abstract class BaseAuditableEntity : BaseEntity
 {
     public DateTime Created { get; set; }
 
-    public string CreatedBy { get; set; } = null!;
+    public string? CreatedBy { get; set; } = null!;
 
     public DateTime LastModified { get; set; }
 

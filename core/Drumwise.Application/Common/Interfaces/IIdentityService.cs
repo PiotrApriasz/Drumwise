@@ -7,9 +7,9 @@ namespace Drumwise.Application.Common.Interfaces;
 
 public interface IIdentityService
 {
-    Task<string?> GetUserNameAsync(string userId);
+    Task<string?> GetUserNameAsync(string? userId);
 
-    Task<string?> GetUserFullNameIfAvailable(string userId);
+    Task<string?> GetUserFullNameIfAvailable(string? userId);
 
     Task<Result> CustomUserRegister(UserRegisterDataRequest userRegisterDataRequest,
         HttpContext context);
@@ -18,4 +18,7 @@ public interface IIdentityService
         ClaimsPrincipal claimsPrincipal);
 
     Task<Result> DeleteUserAsync(string userId);
+
+    Task<string?> GetUserRole(string? userId);
+    Task<bool> IsInRoleAsync(string? userId, string role);
 }

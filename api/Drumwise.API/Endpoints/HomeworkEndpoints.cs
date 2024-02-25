@@ -31,5 +31,15 @@ public static class HomeworkEndpoints
             return result.ProduceApiResponse(homeworks);
         })
         .Produces<HomeworkItemBriefDto>();
+
+        homeworkGroup.MapGet("/{HomeworkId}", async Task<IResult>
+            ([AsParameters] GetHomeworkQuery query, [FromServices] ISender sender) =>
+        {
+            var (result, homework) = await sender.Send(query).ConfigureAwait(false);
+
+            return result.ProduceApiResponse(homework);
+        })
+        .Produces<HomeworkItemDto>()
+        .ProducesValidationProblem(StatusCodes.Status404NotFound);
     }
 }

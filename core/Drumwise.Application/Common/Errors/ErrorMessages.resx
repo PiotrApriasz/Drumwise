@@ -48,4 +48,7 @@
     <data name="Identity.InvalidEmail" xml:space="preserve">
         <value>{0} email is incorrect</value>
     </data>
+    <data name="Homework.NotFound" xml:space="preserve">
+        <value>There is no homework assigned to provided user</value>
+    </data>
 </root>

@@ -30,25 +30,21 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
     private static readonly EmailAddressAttribute EmailAddressAttribute = new();
     private static readonly ILogger Logger = LogManager.GetCurrentClassLogger();
     
-    public  async Task<string?> GetUserNameAsync(string userId)
+    public  async Task<string?> GetUserNameAsync(string? userId)
     {
-        var applicationUser = await GetUsernameById(userId);
-        return applicationUser?.UserName;
+        var applicationUser = await GetUserById(userId);
+        return applicationUser.UserName;
     }
 
-    public async Task<string?> GetUserFullNameIfAvailable(string userId)
+    public async Task<string?> GetUserFullNameIfAvailable(string? userId)
     {
-        var applicationUser = await GetUsernameById(userId);
-
-        if (applicationUser is null)
-            return null;
-
+        var applicationUser = await GetUserById(userId);
+        
         var name = applicationUser.Name;
         var surname = applicationUser.Surname;
 
         return $"{name} {surname}";
     }
-    
 
     // Clients should use that endpoint instead of register endpoint from ASP .NET
     // Identity API endpoint. I implemented that because clients have to call email
@@ -121,9 +117,28 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
         return user != null ? await PerformDeleteUser(user) : Result.Success(ResultType.Ok);
     }
 
-    private async Task<ApplicationUser?> GetUsernameById(string id)
+    public async Task<string?> GetUserRole(string? userId)
+    {
+        var user = await GetUserById(userId);
+
+        var roles = await userManager.GetRolesAsync(user).ConfigureAwait(false);
+
+        return roles.FirstOrDefault();
+    }
+
+    public async Task<bool> IsInRoleAsync(string? userId, string role)
+    {
+        var user = await GetUserById(userId);
+        return await userManager.IsInRoleAsync(user, role);
+    }
+
+    private async Task<ApplicationUser> GetUserById(string? id)
     {
         var user = await userManager.Users.FirstOrDefaultAsync(u => u.Id == id);
+
+        if (user is null)
+            throw new NotFoundException("User not found");
+        
         return user;
     }
 

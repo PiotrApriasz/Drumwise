@@ -18,5 +18,6 @@ public static class ErrorCodes
         public const string TitleIsRequired = "Homework.TitleIsRequired";
         public const string ToLittleDeadline = "Homework.ToLittleDeadline";
         public const string AssignedToIsRequired = "Homework.AssignedToIsRequired";
+        public const string HomeworkNotFound = "Homework.NotFound";
     }
 }

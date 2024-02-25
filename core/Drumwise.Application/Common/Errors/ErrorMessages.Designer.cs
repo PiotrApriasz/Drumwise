@@ -104,5 +104,11 @@ namespace Drumwise.Application.Common.Errors {
                 return ResourceManager.GetString("Identity.InvalidEmail", resourceCulture);
             }
         }
+        
+        internal static string Homework_NotFound {
+            get {
+                return ResourceManager.GetString("Homework.NotFound", resourceCulture);
+            }
+        }
     }
 }
