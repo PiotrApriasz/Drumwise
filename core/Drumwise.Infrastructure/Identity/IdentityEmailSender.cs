@@ -6,20 +6,12 @@ using MimeKit;
 
 namespace Drumwise.Infrastructure.Identity;
 
-public class IdentityEmailSender(IMailSender mailSender, IFileService fileService) : IEmailSender<ApplicationUser>
+public class IdentityEmailSender(IMailSender mailSender) : IEmailSender<ApplicationUser>
 {
     public async Task SendConfirmationLinkAsync(ApplicationUser user, string email, string confirmationLink)
     {
-        var emailConfirmationTemplate = await fileService
-            .GetTemplateAsync("EmailTemplates", "EmailConfirmationTemplate", "html")
-            .ConfigureAwait(false);
-
-        emailConfirmationTemplate = emailConfirmationTemplate
-            .Replace("[EMAIL_ADDRESS]", email)
-            .Replace("[CONFIRMATION_LINK]", confirmationLink);
-
-        await mailSender.SendMailAsync(email, "Confirm your email for Drumwise", 
-            emailConfirmationTemplate, "html").ConfigureAwait(false);
+        var emailData = new EmailConfirmationMailData(email, confirmationLink);
+        await mailSender.SendMailAsync(email, "Confirm your email for Drumwise", emailData).ConfigureAwait(false);
     }
 
     public Task SendPasswordResetLinkAsync(ApplicationUser user, string email, string resetLink)
@@ -32,3 +24,5 @@ public class IdentityEmailSender(IMailSender mailSender, IFileService fileServic
         throw new NotImplementedException();
     }
 }
+
+public record EmailConfirmationMailData(string EmailAddress, string ConfirmationLink) : IMailData;

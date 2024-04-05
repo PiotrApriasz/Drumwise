@@ -31,16 +31,17 @@
 
 
     <ItemGroup>
-      <EmbeddedResource Include="Templates\EmailTemplates\HomeworkCreatedTemplate.html">
+      <EmbeddedResource Include="Templates\EmailTemplates\HomeworkCreatedMailTemplate.html">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </EmbeddedResource>
       <None Remove="Templates\EmailTemplates\EmailConfirmationTemplate.html" />
-      <EmbeddedResource Include="Templates\EmailTemplates\EmailConfirmationTemplate.html">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </EmbeddedResource>
       <EmbeddedResource Update="Common\Errors\ErrorMessages.resx">
         <Generator>ResXFileCodeGenerator</Generator>
         <LastGenOutput>ErrorMessages.Designer.cs</LastGenOutput>
+      </EmbeddedResource>
+      <None Remove="Templates\EmailTemplates\EmailConfirmationMailTemplate.html" />
+      <EmbeddedResource Include="Templates\EmailTemplates\EmailConfirmationMailTemplate.html">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </EmbeddedResource>
     </ItemGroup>
 

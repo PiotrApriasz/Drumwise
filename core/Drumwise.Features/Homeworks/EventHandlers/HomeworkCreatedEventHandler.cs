@@ -7,7 +7,7 @@ using NLog;
 
 namespace Drumwise.Features.Homeworks.EventHandlers;
 
-public class HomeworkCreatedEventHandler(IMailSender mailSender, IIdentityService identityService, IFileService fileService) 
+public class HomeworkCreatedEventHandler(IMailSender mailSender, IIdentityService identityService) 
     : INotificationHandler<HomeworkCreatedEvent>
 {
     private static readonly ILogger Logger = LogManager.GetCurrentClassLogger();
@@ -26,20 +26,21 @@ public class HomeworkCreatedEventHandler(IMailSender mailSender, IIdentityServic
         teacherFullName ??= teacherMail;
         
         var exerciseUrl = $"{notification.ClientUrl}/{CommonClientRoutes.Exercise}/{notification.Item.Id}";
-        
-        var emailTemplate = await fileService
-            .GetTemplateAsync("EmailTemplates", "HomeworkCreatedTemplate", "html")
-            .ConfigureAwait(false);
 
-        emailTemplate = emailTemplate
-            .Replace("[STUDENT_ID]", studentFullName)
-            .Replace("[TEACHER_ID]", teacherFullName)
-            .Replace("[TITLE]", notification.Item.HomeworkTitle)
-            .Replace("[DEADLINE]", notification.Item.Deadline.ToString("D"))
-            .Replace("[EXERCISE_LINK]", exerciseUrl);
+        var emailData = new HomeworkCreatedMailData(studentFullName,
+            teacherFullName,
+            notification.Item.HomeworkTitle,
+            notification.Item.Deadline.ToString("D"),
+            exerciseUrl);
 
         await mailSender
-            .SendMailAsync(studentMail!, "New Drumwise Exercise", emailTemplate, "html")
+            .SendMailAsync(studentMail!, "New Drumwise Exercise", emailData)
             .ConfigureAwait(false);
     }
 }
+
+public record HomeworkCreatedMailData(string? StudentId, 
+    string? TeacherId, 
+    string Title, 
+    string Deadline, 
+    string ExerciseLink) : IMailData;

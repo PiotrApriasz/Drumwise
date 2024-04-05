@@ -6,6 +6,8 @@ using Drumwise.Application.Common.Interfaces;
 using Drumwise.Application.Common.Mappings;
 using Drumwise.Application.Common.Models.Settings;
 using Drumwise.Application.Services;
+using Drumwise.Application.Services.Files;
+using Drumwise.Application.Services.Mailing;
 using Drumwise.Features.Homeworks;
 using Drumwise.Features.Homeworks.Validation;
 using Drumwise.Infrastructure.Data;
