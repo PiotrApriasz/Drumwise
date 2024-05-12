@@ -11,6 +11,7 @@ using Drumwise.Application.Services.Mailing;
 using Drumwise.Features.Homeworks;
 using Drumwise.Features.Homeworks.Validation;
 using Drumwise.Infrastructure.Data;
+using Drumwise.Infrastructure.Data.Files;
 using Drumwise.Infrastructure.Data.Interceptors;
 using Drumwise.Infrastructure.Identity;
 using Drumwise.Infrastructure.Identity.Constants;
@@ -86,6 +87,10 @@ public static class ServicesConfigurator
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<ApplicationDbContextInitializer>();
+        
+        var googleDriveApiSettings = configuration.GetSection("GoogleDriveApiSettings").Get<GoogleDriveApiSettings>();
+        services.AddSingleton(googleDriveApiSettings!);
+        services.AddTransient<IFileStorageService, GoogleDriveService>();
 
         return services;
     }
@@ -116,6 +121,7 @@ public static class ServicesConfigurator
         services.AddTransient<IFileService, FileService>();
         services.AddTransient<IMailSender, MailSender>();
         services.AddSingleton(smtpSettings!);
+        services.AddTransient<IConversionService, ConversionService>();
 
         return services;
     }

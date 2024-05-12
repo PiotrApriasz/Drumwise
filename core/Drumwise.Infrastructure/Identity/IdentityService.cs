@@ -28,7 +28,7 @@ public class IdentityService(UserManager<ApplicationUser> userManager,
     : IIdentityService
 {
     private static readonly EmailAddressAttribute EmailAddressAttribute = new();
-    private static readonly ILogger Logger = LogManager.GetCurrentClassLogger();
+    private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
     
     public  async Task<string?> GetUserNameAsync(string? userId)
     {

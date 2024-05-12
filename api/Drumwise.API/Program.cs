@@ -22,6 +22,11 @@ try
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
+        
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = "X-XSRF-TOKEN";
+    });
 
     builder.Services.AddExceptionHandler<BadHttpRequestExceptionHandler>();
     builder.Services.AddExceptionHandler<ServerExceptionHandler>();
@@ -47,6 +52,8 @@ try
 
     app.UseHttpsRedirection();
 
+    app.UseAntiforgery();
+
     app.UseExceptionHandler();
     
     app.UseMiddleware<ClientApiKeyAuthenticationMiddleware>();
@@ -55,8 +62,10 @@ try
     var apiEndpoints = app.MapGroup("/api").AddFluentValidationAutoValidation();
 
     apiEndpoints.MapIdentityApi<ApplicationUser>();
+    apiEndpoints.MapSecurityEndpoints();
     apiEndpoints.MapAdditionalIdentityEndpoints();
     apiEndpoints.MapHomeworkEndpoints();
+    apiEndpoints.MapDrumsEvaluatingEndpoints();
     // ----------------------------------------------------------------
 
     app.Run();
