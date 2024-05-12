@@ -5,5 +5,6 @@ public enum ResultType
     Ok,
     NoContent,
     NotFound,
-    BadRequest
+    BadRequest,
+    InternalServerError
 }

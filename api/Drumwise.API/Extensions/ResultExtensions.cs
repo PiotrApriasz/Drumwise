@@ -23,6 +23,8 @@ public static class ResultExtensions
                     StatusCodes.Status400BadRequest)),
             ResultType.NotFound => TypedResults.NotFound(CreateProblemResponse(result.Errors,
                 StatusCodes.Status404NotFound)),
+            ResultType.InternalServerError => TypedResults.Problem(CreateProblemResponse(result.Errors,
+                StatusCodes.Status500InternalServerError)),
             _ => TypedResults.Problem("Unsupported result type value", 
                 statusCode: StatusCodes.Status500InternalServerError)
         };

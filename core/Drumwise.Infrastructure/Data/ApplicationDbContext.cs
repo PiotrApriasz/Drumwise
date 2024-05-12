@@ -11,6 +11,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Homework> Homeworks => Set<Homework>();
     public DbSet<Lesson> Lessons => Set<Lesson>();
     public DbSet<UserRating> UserRatings => Set<UserRating>();
+    public DbSet<DrumsAudioToEvaluate> DrumsAudiosToEvaluate => Set<DrumsAudioToEvaluate>();
     
     protected override void OnModelCreating(ModelBuilder builder)
     {

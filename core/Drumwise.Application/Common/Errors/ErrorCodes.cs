@@ -20,4 +20,10 @@ public static class ErrorCodes
         public const string AssignedToIsRequired = "Homework.AssignedToIsRequired";
         public const string HomeworkNotFound = "Homework.NotFound";
     }
+
+    public static class DrumsAudio
+    {
+        public const string IncorrectDrumsAudio = "DrumsAudio.IncorrectDrumsAudio";
+        public const string UploadingFailed = "DrumsAudio.UploadingFailed";
+    }
 }

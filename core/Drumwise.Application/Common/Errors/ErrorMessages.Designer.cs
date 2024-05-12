@@ -110,5 +110,17 @@ namespace Drumwise.Application.Common.Errors {
                 return ResourceManager.GetString("Homework.NotFound", resourceCulture);
             }
         }
+        
+        internal static string DrumsAudio_IncorrectDrumsAudio {
+            get {
+                return ResourceManager.GetString("DrumsAudio.IncorrectDrumsAudio", resourceCulture);
+            }
+        }
+        
+        internal static string DrumsAudio_UploadingFailed {
+            get {
+                return ResourceManager.GetString("DrumsAudio.UploadingFailed", resourceCulture);
+            }
+        }
     }
 }

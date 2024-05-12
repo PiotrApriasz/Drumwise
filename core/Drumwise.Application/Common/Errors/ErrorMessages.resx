@@ -51,4 +51,10 @@
     <data name="Homework.NotFound" xml:space="preserve">
         <value>There is no homework assigned to provided user</value>
     </data>
+    <data name="DrumsAudio.IncorrectDrumsAudio" xml:space="preserve">
+        <value>The uploaded audio file is incorrect</value>
+    </data>
+    <data name="DrumsAudio.UploadingFailed" xml:space="preserve">
+        <value>Drum recording file hasn't been uploaded</value>
+    </data>
 </root>
