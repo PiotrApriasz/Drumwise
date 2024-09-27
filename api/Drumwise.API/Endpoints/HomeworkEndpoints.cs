@@ -35,7 +35,7 @@ public static class HomeworkEndpoints
         homeworkGroup.MapGet("/{HomeworkId}", async Task<IResult>
             ([AsParameters] GetHomeworkQuery query, [FromServices] ISender sender) =>
         {
-            var (result, homework) = await sender.Send(query).ConfigureAwait(false);
+            var (result, homework) = await sender.Send(query);
 
             return result.ProduceApiResponse(homework);
         })

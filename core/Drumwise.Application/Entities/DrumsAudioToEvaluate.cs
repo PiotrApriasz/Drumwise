@@ -10,3 +10,9 @@ public class DrumsAudioToEvaluate : BaseAuditableEntity
     public string? DynamicsEvaluationResult { get; set; }
     public bool Evaluated { get; set; }
 }
+
+enum Item
+{
+    Priority,
+    Quantity
+}
