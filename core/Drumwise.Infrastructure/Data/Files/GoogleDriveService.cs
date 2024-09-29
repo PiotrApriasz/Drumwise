@@ -93,7 +93,7 @@ public class GoogleDriveService(GoogleDriveApiSettings googleDriveApiSettings) :
         };
 
         Logger.Info("Uploading file to Google Drive started. Name: {FileName}", fileName);
-        await uploadRequest.UploadAsync(cancellationToken).ConfigureAwait(false);
+        await uploadRequest.UploadAsync(cancellationToken);
 
         return (uploadSuccess, uploadRequest.ResponseBody.Id);
     }

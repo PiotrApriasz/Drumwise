@@ -8,9 +8,9 @@ internal static class ApiPaths
 
     internal const string HomeworkRootApi = "homework";
 
-    internal const string CreateHomework = HomeworkRootApi;
-    internal const string GetAllHomeworks = HomeworkRootApi;
-    internal const string GetHomeworkById = $"{HomeworkRootApi}/{{HomeworkId}}";
+    internal const string CreateHomework = "/";
+    internal const string GetAllHomeworks = "/";
+    internal const string GetHomeworkById = "/{{HomeworkId}}";
 
     #endregion
 
@@ -19,7 +19,15 @@ internal static class ApiPaths
     internal const string ManageAccountRootApi = "manage";
     
     internal const string CustomRegister = "customRegister";
-    internal const string AddAdditionalUserData = "addAdditionalUserData";
+    internal const string AddAdditionalUserData = "/addAdditionalUserData";
+
+    #endregion
+
+    #region MidiConverter
+
+    internal const string MidiConverterRootApi = "midiconverter";
+    
+    internal const string InitiateAudioConverting = "/initiateAudioConverting";
 
     #endregion
 }

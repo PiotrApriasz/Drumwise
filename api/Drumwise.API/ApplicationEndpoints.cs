@@ -16,6 +16,7 @@ internal static class ApplicationEndpoints
         apiEndpoints.MapSecurityEndpoints();
         
         apiEndpoints.MapHomeworkEndpoints();
+        apiEndpoints.MapMidiConverterEndpoints();
         
     }
 }

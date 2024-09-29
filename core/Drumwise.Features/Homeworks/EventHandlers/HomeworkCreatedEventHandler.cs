@@ -33,9 +33,7 @@ public class HomeworkCreatedEventHandler(IMailSender mailSender, IIdentityServic
             notification.Item.Deadline.ToString("D"),
             exerciseUrl);
 
-        await mailSender
-            .SendMailAsync(studentMail!, "New Drumwise Exercise", emailData)
-            .ConfigureAwait(false);
+        await mailSender.SendMailAsync(studentMail!, "New Drumwise Exercise", emailData);
     }
 }
 
