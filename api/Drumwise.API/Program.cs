@@ -57,16 +57,8 @@ try
     app.UseExceptionHandler();
     
     app.UseMiddleware<ClientApiKeyAuthenticationMiddleware>();
-
-    // Map endpoints --------------------------------------------------
-    var apiEndpoints = app.MapGroup("/api").AddFluentValidationAutoValidation();
-
-    apiEndpoints.MapIdentityApi<ApplicationUser>();
-    apiEndpoints.MapSecurityEndpoints();
-    apiEndpoints.MapAdditionalIdentityEndpoints();
-    apiEndpoints.MapHomeworkEndpoints();
-    apiEndpoints.MapDrumsEvaluatingEndpoints();
-    // ----------------------------------------------------------------
+    
+    app.MapApplicationEndpoints();
 
     app.Run();
 }

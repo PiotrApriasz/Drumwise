@@ -12,7 +12,7 @@ public static class IdentityEndpoints
 {
     public static void MapAdditionalIdentityEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/customRegister", async Task<IResult> (
+        endpoints.MapPost(ApiPaths.CustomRegister, async Task<IResult> (
             [FromBody] UserRegisterDataRequest userRegisterDataRequest,
             [FromServices] IIdentityService identityService,
             HttpContext context) =>
@@ -24,9 +24,9 @@ public static class IdentityEndpoints
             return result.ProduceApiResponse();
         });
             
-        var manageGroup = endpoints.MapGroup("/manage").RequireAuthorization();
+        var manageGroup = endpoints.MapGroup(ApiPaths.ManageAccountRootApi).RequireAuthorization();
         
-        manageGroup.MapPost("/addAdditionalUserData",  async Task<IResult>
+        manageGroup.MapPost(ApiPaths.AddAdditionalUserData,  async Task<IResult>
                 (ClaimsPrincipal claimsPrincipal, [FromBody] AdditionalUserDataRequest additionalUserDataRequest,
                     [FromServices] IIdentityService identityService) =>
             {

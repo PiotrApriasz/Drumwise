@@ -27,12 +27,13 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Results;
 using SharpGrip.FluentValidation.AutoValidation.Shared.Extensions;
+// ReSharper disable ClassNeverInstantiated.Local
 
 namespace Drumwise.API;
 
 public static class ServicesConfigurator
 {
-    public static IServiceCollection ConfigureIdentity(this IServiceCollection services, IConfiguration configuration)
+    public static void ConfigureIdentity(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("IdentityConnection");
         //Guard.Against.Null(connectionString, $"Connection string for 'IdentityConnection' not found");
@@ -65,11 +66,9 @@ public static class ServicesConfigurator
         
         services.AddTransient<IIdentityService, IdentityService>();
         services.AddTransient<IEmailSender<ApplicationUser>, IdentityEmailSender>();
-
-        return services;
     }
     
-    public static IServiceCollection AddInfrastructuresServices(this IServiceCollection services, IConfiguration configuration)
+    public static void AddInfrastructuresServices(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("AppConnection");
         //Guard.Against.Null(connectionString, $"Connection string for 'AppConnection' not found");
@@ -91,11 +90,9 @@ public static class ServicesConfigurator
         var googleDriveApiSettings = configuration.GetSection("GoogleDriveApiSettings").Get<GoogleDriveApiSettings>();
         services.AddSingleton(googleDriveApiSettings!);
         services.AddTransient<IFileStorageService, GoogleDriveService>();
-
-        return services;
     }
 
-    public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
+    public static void AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
         var typeWithMapFromInterface = typeof(HomeworkItemBriefDto);
 
@@ -122,8 +119,6 @@ public static class ServicesConfigurator
         services.AddTransient<IMailSender, MailSender>();
         services.AddSingleton(smtpSettings!);
         services.AddTransient<IConversionService, ConversionService>();
-
-        return services;
     }
     
     private class CustomValidationResultFactory : IFluentValidationAutoValidationResultFactory

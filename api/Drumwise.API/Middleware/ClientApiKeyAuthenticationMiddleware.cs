@@ -8,7 +8,7 @@ public class ClientApiKeyAuthenticationMiddleware : IMiddleware
     
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
-        if (!context.Request.Headers.TryGetValue(ApiKeyHeaderName, out var extractedApiKey))
+        /*if (!context.Request.Headers.TryGetValue(ApiKeyHeaderName, out var extractedApiKey))
         {
             context.Response.StatusCode = 401;
             await context.Response.WriteAsync("Api Key was not provided.");
@@ -28,7 +28,12 @@ public class ClientApiKeyAuthenticationMiddleware : IMiddleware
         }
         
         context.Items["ClientName"] = apiKey.Name;
-        context.Items["ClientAddress"] = apiKey.Address;
+        context.Items["ClientAddress"] = apiKey.Address;*/
+        
+        // DEVELOPMENT
+        
+        context.Items["ClientName"] = "Postman";
+        context.Items["ClientAddress"] = "https://localhost:7272";
 
         await next(context);
     }

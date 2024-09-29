@@ -25,12 +25,11 @@ public class GetHomeworksWithPaginationHandler(ApplicationDbContext context, IMa
         var homeworksRaw = ifTeacher
             ? context.Homeworks.Where(x => x.CreatedBy == loggedUser)
             : context.Homeworks.Where(x => x.AssignedTo == loggedUser);
-            
+
         var homeworks = await homeworksRaw
             .OrderByDescending(x => x.Deadline)
             .ProjectTo<HomeworkItemBriefDto>(mapper.ConfigurationProvider)
-            .PaginatedListAsync(request.PageNumber, request.PageSize)
-            .ConfigureAwait(false);
+            .PaginatedListAsync(request.PageNumber, request.PageSize);
 
         return (Result.Success(ResultType.Ok), homeworks);
     }
