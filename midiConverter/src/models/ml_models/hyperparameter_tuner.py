@@ -1,4 +1,5 @@
 import numpy as np
+import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
@@ -81,3 +82,5 @@ def test_best_models(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm) -> None:
     print("Test accuracy:", accuracy_score(y_test, y_pred_svm))
     print(classification_report(y_test, y_pred_svm))
     print(confusion_matrix(y_test, y_pred_svm))
+
+    joblib.dump(tuned_svm, 'models/trained_models/tuned_svm.pkl')
