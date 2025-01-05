@@ -1,3 +1,4 @@
+import joblib
 import numpy as np
 from sklearn.ensemble import VotingClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -62,3 +63,6 @@ def build_ensemble_classifiers(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm
         print("Accuracy:", accuracy_score(y_test, y_pred))
         print("Classification Report:\n", classification_report(y_test, y_pred))
         print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+        model_filename = f"models/trained_models/{name.lower()}.pkl"
+        joblib.dump(model, model_filename)

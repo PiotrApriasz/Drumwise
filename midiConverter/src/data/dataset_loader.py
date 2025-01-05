@@ -22,11 +22,16 @@ def load_basic_data_set(dataset_path: str = FULL_DATASET_PATH,
                 file_path = os.path.join(folder_path, file_name)
                 audio, _ = librosa.load(file_path, sr=sr, mono=True)
 
-                if len(audio) > desired_length:
-                    audio = audio[:desired_length]
-                else:
-                    audio = np.pad(audio, (0, desired_length - len(audio)), mode='constant')
+                audio = set_length(audio, desired_length)
 
                 data_set.append((audio, drum_instrument))
 
     return data_set
+
+def set_length(audio: np.ndarray, desired_length: int) -> np.ndarray:
+    if len(audio) > desired_length:
+        audio = audio[:desired_length]
+    else:
+        audio = np.pad(audio, (0, desired_length - len(audio)), mode='constant')
+
+    return audio

@@ -75,6 +75,8 @@ def test_best_models(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm) -> None:
     print(classification_report(y_test, y_pred_rf))
     print(confusion_matrix(y_test, y_pred_rf))
 
+    joblib.dump(tuned_svm, 'models/trained_models/tuned_randomforest.pkl')
+
     tuned_svm.fit(X_train, y_train)
     y_pred_svm = tuned_svm.predict(X_test)
 
