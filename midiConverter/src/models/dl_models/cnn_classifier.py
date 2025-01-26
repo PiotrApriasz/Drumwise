@@ -5,6 +5,7 @@ import librosa
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import accuracy_score, confusion_matrix
 
@@ -88,7 +89,7 @@ train_data, val_data, test_data = load_dataset_with_splits()
 
 train_data_aug = create_augmented_dataset(train_data, sr=22050, augment_factor=2)
 
-train_dataset = DrumDataset(train_data_aug, sr=22050)
+train_dataset = DrumDataset(train_data_aug, sr=22050)  # augment=False, bo już mamy gotowe dane
 val_dataset   = DrumDataset(val_data, sr=22050)
 test_dataset  = DrumDataset(test_data, sr=22050)
 
@@ -133,7 +134,8 @@ class DrumCNN(nn.Module):
 
 if __name__ == "__main__":
 
-    print("Current working directory:", os.getcwd())
+    best_val_acc = 0  # Przechowujemy najlepszy val_acc
+    best_model_path = "best_drum_cnn.pth"
 
     model = DrumCNN(num_classes=len(instruments))
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
@@ -141,7 +143,6 @@ if __name__ == "__main__":
 
     patience = 3
     best_val_loss = float('inf')
-    best_val_acc = 0
     epochs_no_improve = 0
     max_epochs = 50
 
@@ -170,6 +171,11 @@ if __name__ == "__main__":
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
+            torch.save(model.state_dict(), best_model_path)
+            print(f"Zapisano nowy najlepszy model z Val Acc: {best_val_acc:.4f}")
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
             epochs_no_improve = 0
         else:
             epochs_no_improve += 1
