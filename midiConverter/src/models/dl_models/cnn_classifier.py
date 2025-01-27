@@ -209,7 +209,7 @@ class DrumCNN(nn.Module):
 
         self.adapool = nn.AdaptiveMaxPool2d((15, 7))
         self.fc1 = nn.Linear(128 * 15 * 7, 128)
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.287)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
@@ -230,81 +230,81 @@ class DrumCNN(nn.Module):
 
 if __name__ == "__main__":
 
-    study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=20)
+    # study = optuna.create_study(direction="maximize")
+    # study.optimize(objective, n_trials=20)
+    #
+    # # Wyniki tuningu
+    # print("Best trial:")
+    # trial = study.best_trial
+    # print(f"  Val Acc: {trial.value}")
+    # print("  Params: ")
+    # for key, value in trial.params.items():
+    #     print(f"    {key}: {value}")
 
-    # Wyniki tuningu
-    print("Best trial:")
-    trial = study.best_trial
-    print(f"  Val Acc: {trial.value}")
-    print("  Params: ")
-    for key, value in trial.params.items():
-        print(f"    {key}: {value}")
+    best_val_acc = 0  # Przechowujemy najlepszy val_acc
+    best_model_path = "best_drum_cnn.pth"
 
-    # best_val_acc = 0  # Przechowujemy najlepszy val_acc
-    # best_model_path = "best_drum_cnn.pth"
-    #
-    # model = DrumCNN(num_classes=len(instruments))
-    # criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, weight_decay=1e-5)
-    # scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-6)
-    #
-    # patience = 3
-    # best_val_loss = float('inf')
-    # epochs_no_improve = 0
-    # max_epochs = 50
-    #
-    # for epoch in range(max_epochs):
-    #     model.train()
-    #     for x_batch, y_batch in train_loader:
-    #         optimizer.zero_grad()
-    #         outputs = model(x_batch)
-    #         loss = criterion(outputs, y_batch)
-    #         loss.backward()
-    #         optimizer.step()
-    #     scheduler.step()
-    #     model.eval()
-    #     val_loss = 0
-    #     correct = 0
-    #     total = 0
-    #     with torch.no_grad():
-    #         for x_val, y_val in val_loader:
-    #             val_out = model(x_val)
-    #             val_loss += criterion(val_out, y_val).item()
-    #             preds = val_out.argmax(dim=1)
-    #             correct += (preds == y_val).sum().item()
-    #             total += y_val.size(0)
-    #     val_loss /= len(val_loader)
-    #     val_acc = correct / total
-    #     print(f"Epoch {epoch+1}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
-    #
-    #     if val_acc > best_val_acc:
-    #         best_val_acc = val_acc
-    #         torch.save(model.state_dict(), best_model_path)
-    #         print(f"Zapisano nowy najlepszy model z Val Acc: {best_val_acc:.4f}")
-    #
-    #     if val_loss < best_val_loss:
-    #         best_val_loss = val_loss
-    #         epochs_no_improve = 0
-    #     else:
-    #         epochs_no_improve += 1
-    #         if epochs_no_improve >= patience:
-    #             print("Early stopping triggered")
-    #             break
-    #
-    # model.eval()
-    # all_preds = []
-    # all_labels = []
-    # with torch.no_grad():
-    #     for x_test, y_test in test_loader:
-    #         outputs = model(x_test)
-    #         preds = outputs.argmax(dim=1)
-    #         all_preds.extend(preds.cpu().numpy())
-    #         all_labels.extend(y_test.cpu().numpy())
-    #
-    # test_acc = accuracy_score(all_labels, all_preds)
-    # cm = confusion_matrix(all_labels, all_preds)
-    # print("Test Accuracy:", test_acc)
-    # print("Confusion Matrix:\n", cm)
-    #
-    # torch.save(model.state_dict(), "drum_cnn.pth")
+    model = DrumCNN(num_classes=len(instruments))
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.000103, weight_decay=1.98e-05)
+    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-6)
+
+    patience = 6
+    best_val_loss = float('inf')
+    epochs_no_improve = 0
+    max_epochs = 50
+
+    for epoch in range(max_epochs):
+        model.train()
+        for x_batch, y_batch in train_loader:
+            optimizer.zero_grad()
+            outputs = model(x_batch)
+            loss = criterion(outputs, y_batch)
+            loss.backward()
+            optimizer.step()
+        scheduler.step()
+        model.eval()
+        val_loss = 0
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for x_val, y_val in val_loader:
+                val_out = model(x_val)
+                val_loss += criterion(val_out, y_val).item()
+                preds = val_out.argmax(dim=1)
+                correct += (preds == y_val).sum().item()
+                total += y_val.size(0)
+        val_loss /= len(val_loader)
+        val_acc = correct / total
+        print(f"Epoch {epoch+1}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            torch.save(model.state_dict(), best_model_path)
+            print(f"Zapisano nowy najlepszy model z Val Acc: {best_val_acc:.4f}")
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve >= patience:
+                print("Early stopping triggered")
+                break
+
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for x_test, y_test in test_loader:
+            outputs = model(x_test)
+            preds = outputs.argmax(dim=1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(y_test.cpu().numpy())
+
+    test_acc = accuracy_score(all_labels, all_preds)
+    cm = confusion_matrix(all_labels, all_preds)
+    print("Test Accuracy:", test_acc)
+    print("Confusion Matrix:\n", cm)
+
+    torch.save(model.state_dict(), "drum_cnn.pth")
