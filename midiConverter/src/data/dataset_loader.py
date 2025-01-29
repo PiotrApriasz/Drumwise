@@ -2,36 +2,40 @@ import os
 import librosa
 import numpy as np
 
-BASIC_DATASET_PATH = "/Users/piotrek/DataSets/DrumInstrumentsDataSet"
-BASIC_DRUM_INSTRUMENTS = ["kick", "snare", "overheads", "toms"]
+from src.models.constants import DRUM_INSTRUMENTS, FULL_DATASET_PATH
 
-FULL_DATASET_PATH = "/Users/piotrek/DataSets/MDLib2.2/Training"
-FULL_DRUM_INSTRUMENTS = ["crash", "floor_tom", "hi-hat", "kick", "rack_tom", "ride", "snare"]
 
-def load_basic_data_set(dataset_path: str = FULL_DATASET_PATH,
-                        instruments: list[str] = FULL_DRUM_INSTRUMENTS,
-                        sr: int = 22050) -> list[tuple[np.ndarray, str]]:
-
-    data_set = []
-    desired_length = sr * 2
-
-    for drum_instrument in instruments:
-        folder_path = os.path.join(dataset_path, drum_instrument)
-        for file_name in os.listdir(folder_path):
-            if file_name.endswith(".wav"):
-                file_path = os.path.join(folder_path, file_name)
-                audio, _ = librosa.load(file_path, sr=sr, mono=True)
-
-                audio = set_length(audio, desired_length)
-
-                data_set.append((audio, drum_instrument))
-
-    return data_set
+def normalize_audio(audio):
+    max_val = np.max(np.abs(audio))
+    if max_val < 1e-8:
+        return audio
+    return audio / max_val
 
 def set_length(audio: np.ndarray, desired_length: int) -> np.ndarray:
     if len(audio) > desired_length:
         audio = audio[:desired_length]
     else:
         audio = np.pad(audio, (0, desired_length - len(audio)), mode='constant')
-
     return audio
+
+def load_subset(subset_path: str, instruments: list[str], sr: int = 22050) -> list[tuple[np.ndarray, str]]:
+    data = []
+    desired_length = sr * 2
+    for inst in instruments:
+        folder_path = os.path.join(subset_path, inst)
+        for file_name in os.listdir(folder_path):
+            if file_name.endswith(".wav"):
+                file_path = os.path.join(folder_path, file_name)
+                audio, _ = librosa.load(file_path, sr=sr, mono=True)
+                audio = set_length(audio, desired_length)
+                audio = normalize_audio(audio)
+                data.append((audio, inst))
+    return data
+
+def load_dataset_with_splits(dataset_path: str = FULL_DATASET_PATH,
+                             instruments: list[str] = DRUM_INSTRUMENTS,
+                             sr: int = 22050):
+    train_data = load_subset(os.path.join(dataset_path, "train"), instruments, sr)
+    val_data   = load_subset(os.path.join(dataset_path, "val"), instruments, sr)
+    test_data  = load_subset(os.path.join(dataset_path, "test"), instruments, sr)
+    return train_data, val_data, test_data

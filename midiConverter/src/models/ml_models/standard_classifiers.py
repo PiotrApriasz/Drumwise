@@ -1,4 +1,5 @@
 import numpy as np
+import joblib
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
@@ -8,9 +9,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
 
 def train_standard_classifiers(X: np.ndarray, y: np.ndarray) -> None:
-    
+
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
@@ -24,12 +26,15 @@ def train_standard_classifiers(X: np.ndarray, y: np.ndarray) -> None:
         "LogisticRegression": LogisticRegression(max_iter=1000),
         "SVM": SVC(kernel='rbf'),
         "DecisionTree": DecisionTreeClassifier(),
-        "kNN": KNeighborsClassifier(n_neighbors=5)
+        "kNN": KNeighborsClassifier(n_neighbors=5),
+        "NaiveBayes": GaussianNB()
     }
 
     for model_name, model in models.items():
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
+
+        joblib.dump(model, f"models/trained_models/{model_name.lower()}.pkl")
 
         print(f"\n=== {model_name} ===")
         print("Accuracy:", accuracy_score(y_test, y_pred))
