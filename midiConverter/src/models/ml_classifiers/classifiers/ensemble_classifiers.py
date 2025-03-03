@@ -1,8 +1,13 @@
+import os
+
 import joblib
 import numpy as np
 from sklearn.ensemble import VotingClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
+
+from src.models.constants import TRAINED_ML_MODELS_PATH
+
 
 def build_ensemble_classifiers(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm) -> None:
 
@@ -42,7 +47,6 @@ def build_ensemble_classifiers(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm
         scores = cross_val_score(model, X, y, cv=skf, scoring='accuracy')
         print(f"{name} - CV Accuracy Mean={scores.mean():.4f}, Std={scores.std():.4f}")
 
-    # train/test split
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
@@ -64,5 +68,5 @@ def build_ensemble_classifiers(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm
         print("Classification Report:\n", classification_report(y_test, y_pred))
         print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
 
-        model_filename = f"models/trained_models/{name.lower()}.pkl"
+        model_filename = os.path.join(os.path.expanduser(TRAINED_ML_MODELS_PATH), f"{name.lower()}.pkl")
         joblib.dump(model, model_filename)

@@ -3,6 +3,8 @@ import librosa
 import soundfile as sf
 import re
 
+from src.models.constants import DRUM_INSTRUMENTS
+
 INPUT_FOLDER = "/Users/piotrek/DataSets/IDMT-SMT-DRUMS-V2/audio"
 OUTPUT_FOLDER = "/Users/piotrek/DataSets/IDMT-SMT-DRUMS-V2/training"
 
@@ -28,16 +30,16 @@ INSTRUMENT_ORDER = [
 def get_set_number(file_name: str) -> str:
     match = re.search(r"set(\d+)", file_name.lower())
     if match:
-        return match.group(1)  # "15" z "set15"
+        return match.group(1)
     return ""
 
 
 def get_instrument(file_path: str):
     file_name = os.path.basename(file_path)
-    set_number = get_set_number(file_name)  # np. z "set15.wav" -> "15"
+    set_number = get_set_number(file_name)
 
     if not set_number:
-        print(f"Nie znaleziono numeru setu w pliku: {file_name}")
+        print(f"Didn't find set number in file: {file_name}")
         return
 
     y, sr = librosa.load(file_path, sr=None, mono=True)
@@ -49,8 +51,8 @@ def get_instrument(file_path: str):
     onset_samples.append(len(y))
 
     if len(onset_samples) < 8:
-        print(f"UWAGA: W pliku {file_name} wykryto za mało uderzeń, aby wyciąć wszystkie instrumenty.")
-        print(f"    Wykryte onsets: {len(onset_samples) - 1} (bez końca pliku).")
+        print(f"WARNING: In file {file_name} there is no enough strikes, to cut out all instruments.")
+        print(f"    Found onsets: {len(onset_samples) - 1} (without end of the file).")
         return
 
     os.makedirs(SETS_OUTPUT_FOLDER, exist_ok=True)
@@ -67,7 +69,7 @@ def get_instrument(file_path: str):
         out_file_path = os.path.join(SETS_OUTPUT_FOLDER, out_file_name)
 
         sf.write(out_file_path, snippet, sr)
-        print(f"[{file_name}] Zapisano: {out_file_name}")
+        print(f"[{file_name}] Saved: {out_file_name}")
 
 def create_folder():
     for inst_code, folder_name in instrument_folders.items():
@@ -77,11 +79,11 @@ def create_folder():
 def extract_instrument_code(file_name: str):
     file_name_upper = file_name.upper()
     if "KD" in file_name_upper:
-        return "kick"
+        return DRUM_INSTRUMENTS[4]
     elif "SD" in file_name_upper:
-        return "snare"
+        return DRUM_INSTRUMENTS[0]
     elif "HH" in file_name_upper:
-        return "hi-hat"
+        return DRUM_INSTRUMENTS[3]
     else:
         return None
 

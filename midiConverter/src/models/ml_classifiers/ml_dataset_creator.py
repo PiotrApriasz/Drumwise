@@ -1,9 +1,12 @@
+import os
+
 import joblib
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 from src.data.dataset_loader import load_dataset_with_splits
 from src.data.feature_extractor import extract_features
+from src.models.constants import TRAINED_ML_MODELS_PATH
 
 
 def prepare_final_data() -> tuple[np.ndarray, np.ndarray]:
@@ -24,7 +27,7 @@ def prepare_final_data() -> tuple[np.ndarray, np.ndarray]:
     encoder = LabelEncoder()
     y_encoded = encoder.fit_transform(y)
 
-    joblib.dump(scaler, 'models/trained_models/scaler.pkl')
-    joblib.dump(encoder, 'models/trained_models/encoder.pkl')
+    joblib.dump(scaler, os.path.join(TRAINED_ML_MODELS_PATH, 'scaler.pkl'))
+    joblib.dump(encoder, os.path.join(TRAINED_ML_MODELS_PATH, 'encoder.pkl'))
 
     return X_scaled, y_encoded

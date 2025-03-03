@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset_loader import load_dataset_with_splits
 from src.models.constants import DRUM_INSTRUMENTS
-from src.models.dl_models.cnn_classifier import create_augmented_dataset, DrumDataset, SEBlock
+from src.models.dl_classifiers.classifiers.cnn_classifier import create_augmented_dataset, DrumDataset, SEBlock
 
 
 def objective(trial):

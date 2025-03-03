@@ -2,7 +2,7 @@ import os
 import librosa
 import numpy as np
 
-from src.models.constants import DRUM_INSTRUMENTS, FULL_DATASET_PATH
+from src.models.constants import DRUM_INSTRUMENTS, INSTRUMENTS_DATA_SET_PATH
 
 
 def normalize_audio(audio):
@@ -32,7 +32,7 @@ def load_subset(subset_path: str, instruments: list[str], sr: int = 22050) -> li
                 data.append((audio, inst))
     return data
 
-def load_dataset_with_splits(dataset_path: str = FULL_DATASET_PATH,
+def load_dataset_with_splits(dataset_path: str = INSTRUMENTS_DATA_SET_PATH,
                              instruments: list[str] = DRUM_INSTRUMENTS,
                              sr: int = 22050):
     train_data = load_subset(os.path.join(dataset_path, "train"), instruments, sr)

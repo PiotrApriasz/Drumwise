@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import joblib
 from sklearn.ensemble import RandomForestClassifier
@@ -5,6 +7,9 @@ from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
+
+from src.models.constants import TRAINED_ML_MODELS_PATH
+
 
 def tune_models(X: np.ndarray, y: np.ndarray):
 
@@ -75,7 +80,7 @@ def test_best_models(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm) -> None:
     print(classification_report(y_test, y_pred_rf))
     print(confusion_matrix(y_test, y_pred_rf))
 
-    joblib.dump(tuned_svm, 'models/trained_models/tuned_randomforest.pkl')
+    joblib.dump(tuned_svm, os.path.join(TRAINED_ML_MODELS_PATH, 'tuned_randomforest.pkl'))
 
     tuned_svm.fit(X_train, y_train)
     y_pred_svm = tuned_svm.predict(X_test)
@@ -85,4 +90,4 @@ def test_best_models(X: np.ndarray, y: np.ndarray, tuned_rf, tuned_svm) -> None:
     print(classification_report(y_test, y_pred_svm))
     print(confusion_matrix(y_test, y_pred_svm))
 
-    joblib.dump(tuned_svm, 'models/trained_models/tuned_svm.pkl')
+    joblib.dump(tuned_svm, os.path.join(TRAINED_ML_MODELS_PATH, 'tuned_svm.pkl'))

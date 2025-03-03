@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import joblib
 
@@ -10,6 +12,9 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
+
+from src.models.constants import TRAINED_ML_MODELS_PATH
+
 
 def train_standard_classifiers(X: np.ndarray, y: np.ndarray) -> None:
 
@@ -34,7 +39,7 @@ def train_standard_classifiers(X: np.ndarray, y: np.ndarray) -> None:
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
-        joblib.dump(model, f"models/trained_models/{model_name.lower()}.pkl")
+        joblib.dump(model, os.path.join(TRAINED_ML_MODELS_PATH, f"{model_name.lower()}.pkl"))
 
         print(f"\n=== {model_name} ===")
         print("Accuracy:", accuracy_score(y_test, y_pred))

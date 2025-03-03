@@ -8,8 +8,10 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 from src.data.dataset_loader import load_dataset_with_splits
 from src.data.tools.dataset_augumentation import create_augmented_dataset
 from src.models.constants import DRUM_INSTRUMENTS
-from src.models.dl_models.dl_dataset_creator import DrumDataset
+from src.models.dl_classifiers.dl_dataset_creator import DrumDataset
+from src.models.dl_classifiers.dl_models_visualizator import visualize_cnn_feature_maps
 
+label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
 
 class SEBlock(nn.Module):
     def __init__(self, channels, reduction=16):
@@ -40,6 +42,7 @@ class DrumCNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(64)
         self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.bn4 = nn.BatchNorm2d(128)
+        self.se2 = SEBlock(128)
 
         self.adapool = nn.AdaptiveMaxPool2d((15, 7))
         self.fc1 = nn.Linear(128 * 15 * 7, 128)
@@ -54,6 +57,7 @@ class DrumCNN(nn.Module):
 
         x = F.relu(self.bn3(self.conv3(x)))
         x = F.relu(self.bn4(self.conv4(x)))
+        x = self.se2(x)
         x = self.pool(x)
 
         x = self.adapool(x)
@@ -66,35 +70,55 @@ class DrumCNN(nn.Module):
 def train_cnn_classifier(model_path, best_model_path):
     best_val_acc = 0
 
-    label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
-
     train_data, val_data, test_data = load_dataset_with_splits()
     train_data_aug = create_augmented_dataset(train_data, sr=22050, augment_factor=2)
     train_dataset = DrumDataset(train_data_aug, label_map, sr=22050)
     val_dataset = DrumDataset(val_data, label_map, sr=22050)
     test_dataset = DrumDataset(test_data, label_map, sr=22050)
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False, num_workers=4)
+    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=4)
 
     model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.000103, weight_decay=1.98e-05)
     scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-6)
 
+    activation = {}
+    def get_activation(name):
+        def hook(model, input, output):
+            activation[name] = output.detach()
+        return hook
+
+    model.conv1.register_forward_hook(get_activation('conv1'))
+    model.conv4.register_forward_hook(get_activation('conv4'))
+    model.se1.register_forward_hook(get_activation('se1'))
+    if hasattr(model, 'se2'):
+        model.se2.register_forward_hook(get_activation('se2'))
+    
     patience = 6
     best_val_loss = float('inf')
     epochs_no_improve = 0
     max_epochs = 50
 
+    train_losses = []
+    val_losses = []
+    val_accs = []
+
     for epoch in range(max_epochs):
         model.train()
+        train_loss = 0
         for x_batch, y_batch in train_loader:
             optimizer.zero_grad()
             outputs = model(x_batch)
             loss = criterion(outputs, y_batch)
             loss.backward()
             optimizer.step()
+            train_loss += loss.item()
+        
+        train_loss /= len(train_loader)
+        train_losses.append(train_loss)
+        
         scheduler.step()
         model.eval()
         val_loss = 0
@@ -108,8 +132,12 @@ def train_cnn_classifier(model_path, best_model_path):
                 correct += (preds == y_val).sum().item()
                 total += y_val.size(0)
         val_loss /= len(val_loader)
+        val_losses.append(val_loss)
+        
         val_acc = correct / total
-        print(f"Epoch {epoch + 1}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+        val_accs.append(val_acc)
+        
+        print(f"Epoch {epoch + 1}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
@@ -125,7 +153,11 @@ def train_cnn_classifier(model_path, best_model_path):
                 print("Early stopping triggered")
                 break
 
+    model.load_state_dict(torch.load(best_model_path))
     model.eval()
+
+    visualize_cnn_feature_maps(activation, test_loader, model)
+
     all_preds = []
     all_labels = []
     with torch.no_grad():
@@ -140,4 +172,20 @@ def train_cnn_classifier(model_path, best_model_path):
     print("Test Accuracy:", test_acc)
     print("Confusion Matrix:\n", cm)
 
+    class_names = list(DRUM_INSTRUMENTS)
+    print("\nPer-class accuracy:")
+    for i, instrument in enumerate(class_names):
+        class_correct = cm[i, i]
+        class_total = cm[i, :].sum()
+        if class_total > 0:
+            print(f"{instrument}: {class_correct/class_total:.4f}")
+
     torch.save(model.state_dict(), model_path)
+
+    return {
+        "train_losses": train_losses,
+        "val_losses": val_losses,
+        "val_accs": val_accs,
+        "test_acc": test_acc,
+        "confusion_matrix": cm
+    }

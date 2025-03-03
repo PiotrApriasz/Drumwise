@@ -6,27 +6,25 @@ import joblib
 
 from src.data.feature_extractor import extract_features_from_audio
 from src.data.dataset_loader import set_length
+from src.models.constants import DRUM_INSTRUMENTS
 
 
 def extract_true_label(file_name: str) -> str:
-
     name_lower = file_name.lower()
-
     if "kick" in name_lower:
-        return "kick"
+        return DRUM_INSTRUMENTS[4]
     elif "snare" in name_lower:
-        return "snare"
+        return DRUM_INSTRUMENTS[0]
     elif "hi-hat" in name_lower or "hihat" in name_lower:
-        return "hi-hat"
+        return DRUM_INSTRUMENTS[3]
     elif "crash" in name_lower:
-        return "crash"
+        return DRUM_INSTRUMENTS[1]
     elif "rack_tom" in name_lower:
-        return "rack_tom"
+        return DRUM_INSTRUMENTS[5]
     elif "floor_tom" in name_lower:
-        return "floor_tom"
+        return DRUM_INSTRUMENTS[2]
     elif "ride" in name_lower:
-        return "ride"
-
+        return DRUM_INSTRUMENTS[6]
     return "unknown"
 
 
@@ -59,12 +57,12 @@ def classify_instrument(path, model, saved_scaler, saved_label_encoder):
     return predicted_class[0]
 
 if __name__ == "__main__":
-    svm_model = joblib.load('../models/trained_models/ml_trained_models/stackingensemble.pkl')
-    scaler = joblib.load('../models/trained_models/ml_trained_models/scaler.pkl')
-    label_encoder = joblib.load('../models/trained_models/ml_trained_models/encoder.pkl')
+    svm_model = joblib.load('../trained_models/ml_trained_models/stackingensemble.pkl')
+    scaler = joblib.load('../trained_models/ml_trained_models/scaler.pkl')
+    label_encoder = joblib.load('../trained_models/ml_trained_models/encoder.pkl')
 
     # just to test
-    audio_files_path = "../../audio"
+    audio_files_path = "../../../audio"
 
     correct_count = 0
     total_count = 0
