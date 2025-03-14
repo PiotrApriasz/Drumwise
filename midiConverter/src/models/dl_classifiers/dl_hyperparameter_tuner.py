@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset_loader import load_dataset_with_splits
 from src.models.constants import DRUM_INSTRUMENTS
-from src.models.dl_classifiers.classifiers.cnn_classifier import create_augmented_dataset, DrumDataset, SEBlock
+from src.models.dl_classifiers.classifiers.cnn_classifier import create_augmented_dataset, CqtDrumDataset, SEBlock
 
 
 def objective(trial):
@@ -88,8 +88,8 @@ if __name__ == "__main__":
 
     train_data, val_data, _ = load_dataset_with_splits()
     train_data_aug = create_augmented_dataset(train_data, sr=22050, augment_factor=2)
-    train_dataset = DrumDataset(train_data_aug, sr=22050)
-    val_dataset = DrumDataset(val_data, sr=22050)
+    train_dataset = CqtDrumDataset(train_data_aug, sr=22050)
+    val_dataset = CqtDrumDataset(val_data, sr=22050)
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 

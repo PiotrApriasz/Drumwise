@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 from src.data.dataset_loader import load_dataset_with_splits
 from src.data.tools.dataset_augumentation import create_augmented_dataset
 from src.models.constants import DRUM_INSTRUMENTS
-from src.models.dl_classifiers.dl_dataset_creator import DrumDataset
+from src.models.dl_classifiers.dl_dataset_creator import CqtDrumDataset, MelDrumDataset
 from src.models.dl_classifiers.dl_models_visualizator import visualize_cnn_feature_maps
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
@@ -67,14 +67,21 @@ class DrumCNN(nn.Module):
         return self.fc2(x)
 
 
-def train_cnn_classifier(model_path, best_model_path):
+def train_cnn_classifier(model_path, best_model_path, train_with_mel=False):
     best_val_acc = 0
 
     train_data, val_data, test_data = load_dataset_with_splits()
     train_data_aug = create_augmented_dataset(train_data, sr=22050, augment_factor=2)
-    train_dataset = DrumDataset(train_data_aug, label_map, sr=22050)
-    val_dataset = DrumDataset(val_data, label_map, sr=22050)
-    test_dataset = DrumDataset(test_data, label_map, sr=22050)
+
+    if train_with_mel:
+        train_dataset = MelDrumDataset(train_data_aug, label_map, sr=22050)
+        val_dataset = MelDrumDataset(val_data, label_map, sr=22050)
+        test_dataset = MelDrumDataset(test_data, label_map, sr=22050)
+    else:
+        train_dataset = CqtDrumDataset(train_data_aug, label_map, sr=22050)
+        val_dataset = CqtDrumDataset(val_data, label_map, sr=22050)
+        test_dataset = CqtDrumDataset(test_data, label_map, sr=22050)
+
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=4)
@@ -156,7 +163,7 @@ def train_cnn_classifier(model_path, best_model_path):
     model.load_state_dict(torch.load(best_model_path))
     model.eval()
 
-    visualize_cnn_feature_maps(activation, test_loader, model)
+    #visualize_cnn_feature_maps(activation, test_loader, model)
 
     all_preds = []
     all_labels = []

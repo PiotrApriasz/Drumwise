@@ -1,3 +1,7 @@
+import librosa
+import numpy as np
+import torch
+
 from src.models.constants import DRUM_INSTRUMENTS
 
 
@@ -28,16 +32,31 @@ def set_length(audio: np.ndarray, desired_length: int) -> np.ndarray:
     return audio
 
 
-def classify_instrument_dl(path, model, sr=22050, duration=2, use_ensemble=False):
+def classify_instrument_dl_mel(path, model, sr=22050, duration=2, use_ensemble=False, use_mel_model=False):
     y, _ = librosa.load(path, sr=sr, mono=True)
     y = set_length(y, sr * duration)
-    cqt = librosa.cqt(y, sr=sr, hop_length=512)
-    cqt_db = librosa.amplitude_to_db(np.abs(cqt), ref=np.max)
-    x = torch.tensor(cqt_db, dtype=torch.float).unsqueeze(0).unsqueeze(0)
-
+    
     if use_ensemble:
-        pred_idx = model.predict(x)
+        pred_idx = model.predict(y, sr)
+    elif use_mel_model:
+        mel_spec = librosa.feature.melspectrogram(
+            y=y, 
+            sr=sr, 
+            n_mels=256,
+            hop_length=256,
+            n_fft=2048
+        )
+        mel_db = librosa.power_to_db(mel_spec, ref=np.max)
+        x = torch.tensor(mel_db, dtype=torch.float).unsqueeze(0).unsqueeze(0)
+        
+        with torch.no_grad():
+            outputs = model(x)
+            pred_idx = outputs.argmax(dim=1).item()
     else:
+        cqt = librosa.cqt(y, sr=sr, hop_length=512)
+        cqt_db = librosa.amplitude_to_db(np.abs(cqt), ref=np.max)
+        x = torch.tensor(cqt_db, dtype=torch.float).unsqueeze(0).unsqueeze(0)
+
         with torch.no_grad():
             outputs = model(x)
             pred_idx = outputs.argmax(dim=1).item()

@@ -4,52 +4,127 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, confusion_matrix
+import librosa
 
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
 from src.models.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH
 from src.data.dataset_loader import load_dataset_with_splits
-from src.models.dl_classifiers.dl_dataset_creator import DrumDataset
+from src.models.dl_classifiers.dl_dataset_creator import CqtDrumDataset
 
 
-class DrumEnsemble:
-    def __init__(self, model_paths, device=None):
+class HeterogeneousEnsemble:
+    def __init__(self, model_paths, model_types, device=None):
         self.models = []
-
-        for path in model_paths:
+        self.model_types = model_types
+        
+        for path, model_type in zip(model_paths, model_types):
             model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
             model.load_state_dict(torch.load(path))
             model.eval()
             self.models.append(model)
         
-        print(f"Loaded {len(self.models)} models for ensemble prediction")
+        print(f"Loaded {len(self.models)} models for heterogeneous ensemble prediction")
     
-    def predict(self, x):
+    def preprocess_audio(self, audio, sr=22050, model_type='cqt'):
+        if model_type == 'mel':
+            mel_spec = librosa.feature.melspectrogram(
+                y=audio, 
+                sr=sr, 
+                n_mels=256,
+                hop_length=256,
+                n_fft=2048
+            )
+            mel_db = librosa.power_to_db(mel_spec, ref=np.max)
+            return torch.tensor(mel_db, dtype=torch.float).unsqueeze(0)
+        else:
+            cqt = librosa.cqt(audio, sr=sr, hop_length=512)
+            cqt_mag = np.abs(cqt)
+            cqt_db = librosa.amplitude_to_db(cqt_mag, ref=np.max)
+            return torch.tensor(cqt_db, dtype=torch.float).unsqueeze(0)
+    
+    def predict(self, audio, sr=22050):
         all_logits = []
         
         with torch.no_grad():
-            for model in self.models:
+            for i, model in enumerate(self.models):
+                x = self.preprocess_audio(audio, sr, self.model_types[i])
+                x = x.unsqueeze(0)
                 logits = model(x)
                 all_logits.append(logits)
 
         avg_logits = torch.mean(torch.stack(all_logits), dim=0)
-
         return torch.argmax(avg_logits, dim=1).item()
     
-    def predict_proba(self, x):
+    def predict_proba(self, audio, sr=22050):
         all_probs = []
         
         with torch.no_grad():
-            for model in self.models:
+            for i, model in enumerate(self.models):
+                x = self.preprocess_audio(audio, sr, self.model_types[i])
+                x = x.unsqueeze(0)
                 logits = model(x)
                 probs = torch.softmax(logits, dim=1)
                 all_probs.append(probs)
 
         avg_probs = torch.mean(torch.stack(all_probs), dim=0)
-        
         return avg_probs.cpu().numpy()[0]
 
+    def predict_with_confidence(self, audio, sr=22050):
+        all_probs = []
+        
+        with torch.no_grad():
+            for i, model in enumerate(self.models):
+                x = self.preprocess_audio(audio, sr, self.model_types[i])
+                x = x.unsqueeze(0)
+                logits = model(x)
+                probs = torch.softmax(logits, dim=1)
+                all_probs.append(probs)
 
-def train_ensemble(num_models=3, device=None):
+        avg_probs = torch.mean(torch.stack(all_probs), dim=0)
+
+        confidence, pred_class = torch.max(avg_probs, dim=1)
+        
+        return pred_class.item(), confidence.item()
+
+
+def evaluate_ensemble(model_paths):
+    ensemble = HeterogeneousEnsemble(model_paths, model_types=['cqt'] * len(model_paths))
+
+    label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
+    _, _, test_data = load_dataset_with_splits()
+    test_dataset = CqtDrumDataset(test_data, label_map, sr=22050)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+    all_preds = []
+    all_labels = []
+
+    for x_test, y_test in test_loader:
+        pred = ensemble.predict(x_test)
+        all_preds.append(pred)
+        all_labels.append(y_test.item())
+
+    test_acc = accuracy_score(all_labels, all_preds)
+    cm = confusion_matrix(all_labels, all_preds)
+
+    print("Ensemble Test Accuracy:", test_acc)
+    print("Confusion Matrix:\n", cm)
+
+    print("\nPer-class accuracy:")
+    for i, instrument in enumerate(DRUM_INSTRUMENTS):
+        class_correct = cm[i, i]
+        class_total = cm[i, :].sum()
+        if class_total > 0:
+            print(f"{instrument}: {class_correct / class_total:.4f}")
+
+    return {
+        "test_acc": test_acc,
+        "confusion_matrix": cm
+    }
+
+
+# TODO: Below code move to another file
+
+def train_ensemble(num_models=3):
 
     model_paths = []
     
@@ -70,44 +145,9 @@ def train_ensemble(num_models=3, device=None):
     return model_paths
 
 
-def evaluate_ensemble(model_paths, device=None):
-    ensemble = DrumEnsemble(model_paths)
-
-    label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
-    _, _, test_data = load_dataset_with_splits()
-    test_dataset = DrumDataset(test_data, label_map, sr=22050)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
-    all_preds = []
-    all_labels = []
-    
-    for x_test, y_test in test_loader:
-        pred = ensemble.predict(x_test)
-        all_preds.append(pred)
-        all_labels.append(y_test.item())
-
-    test_acc = accuracy_score(all_labels, all_preds)
-    cm = confusion_matrix(all_labels, all_preds)
-    
-    print("Ensemble Test Accuracy:", test_acc)
-    print("Confusion Matrix:\n", cm)
-
-    print("\nPer-class accuracy:")
-    for i, instrument in enumerate(DRUM_INSTRUMENTS):
-        class_correct = cm[i, i]
-        class_total = cm[i, :].sum()
-        if class_total > 0:
-            print(f"{instrument}: {class_correct/class_total:.4f}")
-    
-    return {
-        "test_acc": test_acc,
-        "confusion_matrix": cm
-    }
-
-
 def compare_ensemble_vs_single(ensemble_paths, single_model_path, device=None):
 
-    ensemble = DrumEnsemble(ensemble_paths)
+    ensemble = HeterogeneousEnsemble(ensemble_paths, model_types=['cqt'] * len(ensemble_paths))
 
     
     single_model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
@@ -116,7 +156,7 @@ def compare_ensemble_vs_single(ensemble_paths, single_model_path, device=None):
 
     label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
     _, _, test_data = load_dataset_with_splits()
-    test_dataset = DrumDataset(test_data, label_map, sr=22050)
+    test_dataset = CqtDrumDataset(test_data, label_map, sr=22050)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     ensemble_preds = []

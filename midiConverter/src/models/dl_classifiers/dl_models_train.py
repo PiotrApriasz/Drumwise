@@ -8,15 +8,14 @@ from src.models.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH
 from src.models.dl_classifiers.dl_models_visualizator import visualize_cnn_model_performance
 
 if __name__ == "__main__":
-    metrics = train_cnn_classifier(os.path.join(TRAINED_DL_MODELS_PATH, "cnn_model.pth"),
-                                   os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth"))
+    metrics = train_cnn_classifier(os.path.join(TRAINED_DL_MODELS_PATH, "mel_cnn_model.pth"),
+                                   os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth"))
 
-    visualize_cnn_model_performance(metrics)
+    #visualize_cnn_model_performance(metrics)
     
     print("\nModel training complete!")
     print(f"Final test accuracy: {metrics['test_acc']:.4f}")
-    
-    # Print per-class metrics
+
     cm = metrics["confusion_matrix"]
     print("\nPer-class accuracy:")
     for i, instrument in enumerate(DRUM_INSTRUMENTS):

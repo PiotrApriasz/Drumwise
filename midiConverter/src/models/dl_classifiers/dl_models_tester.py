@@ -2,32 +2,29 @@ import os
 
 import torch
 
-from src.converters.conversion_utils import extract_true_label, classify_instrument_dl
+from src.converters.conversion_utils import extract_true_label, classify_instrument_dl_mel
 from src.models.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, AUDIO_PATH
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
-from src.models.dl_classifiers.classifiers.ensemble_cnn_classifier import DrumEnsemble
-
+from src.models.dl_classifiers.classifiers.heterogeneous_cnn_classifier import HeterogeneousEnsemble
 
 if __name__ == "__main__":
     use_ensemble = True
     
     if use_ensemble:
-        # Load ensemble models
         model_paths = [
-            os.path.join(TRAINED_DL_MODELS_PATH, "best_ensemble_model_1.pth"),
-            os.path.join(TRAINED_DL_MODELS_PATH, "best_ensemble_model_2.pth"),
-            os.path.join(TRAINED_DL_MODELS_PATH, "best_ensemble_model_3.pth"),
-            os.path.join(TRAINED_DL_MODELS_PATH, "best_ensemble_model_4.pth"),
-            os.path.join(TRAINED_DL_MODELS_PATH, "best_ensemble_model_5.pth")
+            os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth"),
+            os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth")
         ]
-        model = DrumEnsemble(model_paths)
+        model_types = ['mel', 'cqt']
+        model = HeterogeneousEnsemble(model_paths, model_types)
     else:
-        model_path = os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth")
+        model_path = os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth")
         model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
         model.load_state_dict(torch.load(model_path))
         model.eval()
 
-    audio_files_path = AUDIO_PATH
+    #audio_files_path = AUDIO_PATH
+    audio_files_path = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrackSet/samples/pattern_segments"
     correct_count = 0
     total_count = 0
 
@@ -39,7 +36,7 @@ if __name__ == "__main__":
             if true_label == "unknown":
                 continue
             audio_path = os.path.join(audio_files_path, file_name)
-            predicted_label = classify_instrument_dl(audio_path, model, use_ensemble=use_ensemble)
+            predicted_label = classify_instrument_dl_mel(audio_path, model, use_ensemble=use_ensemble)
             print(f"File: {file_name}")
             print(f"Predicted: {predicted_label}, True: {true_label}\n")
             total_count += 1
