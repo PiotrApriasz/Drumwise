@@ -366,3 +366,5 @@ MigrationBackup/
 FodyWeavers.xsd
 
 api/Drumwise.API/appsettings.Development.json
+
+.env

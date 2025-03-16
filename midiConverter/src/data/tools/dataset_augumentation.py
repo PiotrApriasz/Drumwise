@@ -1,17 +1,7 @@
-import os
-import torch
 import random
-import optuna
 import librosa
 import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import accuracy_score, confusion_matrix
 
-from src.data.dataset_loader import load_dataset_with_splits
-from src.models.constants import DRUM_INSTRUMENTS
 
 def time_shift(audio, sr, max_shift_s=0.1):
     max_shift = int(max_shift_s * sr)

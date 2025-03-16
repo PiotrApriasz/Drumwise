@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 import librosa
 
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
-from src.models.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH
+from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME
 from src.data.dataset_loader import load_dataset_with_splits
 from src.models.dl_classifiers.dl_dataset_creator import CqtDrumDataset
 
@@ -233,6 +233,6 @@ if __name__ == "__main__":
     ensemble_metrics = evaluate_ensemble(model_paths)
 
     compare_metrics = compare_ensemble_vs_single(model_paths,
-                                                 os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth"))
+                                                 os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME))
     
     print("\nEnsemble training and evaluation complete!")

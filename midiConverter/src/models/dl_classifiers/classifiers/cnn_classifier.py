@@ -7,9 +7,9 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 
 from src.data.dataset_loader import load_dataset_with_splits
 from src.data.tools.dataset_augumentation import create_augmented_dataset
-from src.models.constants import DRUM_INSTRUMENTS
+from src.constants import DRUM_INSTRUMENTS
 from src.models.dl_classifiers.dl_dataset_creator import CqtDrumDataset, MelDrumDataset
-from src.models.dl_classifiers.dl_models_visualizator import visualize_cnn_feature_maps
+#from src.models.dl_classifiers.dl_models_visualizator import visualize_cnn_feature_maps
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
 

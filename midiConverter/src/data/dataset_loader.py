@@ -2,7 +2,7 @@ import os
 import librosa
 import numpy as np
 
-from src.models.constants import DRUM_INSTRUMENTS, INSTRUMENTS_DATA_SET_PATH
+from src.constants import DRUM_INSTRUMENTS, INSTRUMENTS_DATA_SET_PATH
 
 
 def normalize_audio(audio):

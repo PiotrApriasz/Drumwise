@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+
+  # backend:
+  #     build:
+  #       context: ./backend
+  #       dockerfile: Dockerfile
+  #     volumes:
+  #       - ./backend:/app
+  #       - ./data:/app/data 
+  #       - ./midiConverter:/app/midiConverter
+  #     env_file:
+  #       - .env
+  #     ports:
+  #       - "5000:5000"
+  #     depends_on:
+  #       - auth_db_postgres
+  #       - main_db_mongo
+  #       - midiconverter
+  #     restart: always
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./frontend:/app
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - backend
+  #   restart: always
+
+  midiconverter:
+    build:
+      context: ./midiConverter
+      dockerfile: Dockerfile
+    volumes:
+      - ./midiConverter:/app
+      - ./data:/app/data
+    env_file:
+      - .env
+    restart: always
+    tty: true
+    stdin_open: true 
+
+#   auth_db_postgres:
+#     image: postgres:15
+#     environment:
+#       POSTGRES_DB: ${POSTGRES_DB}
+#       POSTGRES_USER: ${POSTGRES_USER}
+#       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#     volumes:
+#       - auth_db_postgres_data:/var/lib/postgresql/data
+#     restart: always
+
+#   main_db_mongo:
+#     image: mongo:6.0
+#     container_name: main_db_mongo
+#     restart: always
+#     ports:
+#       - "27017:27017"
+#     volumes:
+#       - main_db_mongo_data:/data/db
+#     environment:
+#       - MONGO_URI=${MONGO_URI}
+
+# volumes:
+#   auth_db_postgres_data:
+#   main_db_mongo_data:

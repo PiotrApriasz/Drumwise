@@ -2,7 +2,7 @@ import librosa
 import numpy as np
 import torch
 
-from src.models.constants import DRUM_INSTRUMENTS
+from src.constants import (DRUM_INSTRUMENTS)
 
 
 def extract_true_label(file_name: str) -> str:

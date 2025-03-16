@@ -3,13 +3,13 @@ import librosa
 import soundfile as sf
 import re
 
-from src.models.constants import DRUM_INSTRUMENTS
+from src.constants import DRUM_INSTRUMENTS
 
-INPUT_FOLDER = "/Users/piotrek/DataSets/IDMT-SMT-DRUMS-V2/audio"
-OUTPUT_FOLDER = "/Users/piotrek/DataSets/IDMT-SMT-DRUMS-V2/training"
+INPUT_FOLDER = "---"
+OUTPUT_FOLDER = "---"
 
-SETS_INPUT_FOLDER = "/Users/piotrek/Developer/Drumwise/midiConverter/audio/sets"
-SETS_OUTPUT_FOLDER = "/Users/piotrek/Developer/Drumwise/midiConverter/audio"
+SETS_INPUT_FOLDER = "---"
+SETS_OUTPUT_FOLDER = "---"
 
 instrument_folders = {
     "KD": "kick",

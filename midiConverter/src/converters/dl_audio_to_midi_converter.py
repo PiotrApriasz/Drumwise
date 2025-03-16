@@ -7,7 +7,8 @@ from scipy.io import wavfile
 import torch
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
 from src.models.dl_classifiers.classifiers.heterogeneous_cnn_classifier import HeterogeneousEnsemble
-from src.models.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH
+from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, TO_CONVERT_PATH, MEL_BEST_CNN_MODEL_NAME, \
+    CQT_BEST_CNN_MODEL_NAME, TESTING_ONSETS_PATH, CONVERTED_PATH
 
 from src.converters.conversion_utils import set_length, classify_instrument_dl_mel
 
@@ -213,16 +214,8 @@ def create_midi_file(onset_times, instruments, output_path, bpm=120.0, velocitie
     return None
 
 
-def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel_model=False,  use_ensemble=False, output_dir=None, save_onsets=False):
+def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel_model=False,  use_ensemble=False, save_onsets=False):
 
-    if output_dir is None:
-        output_dir = os.path.dirname(output_midi_path)
-    
-    os.makedirs(output_dir, exist_ok=True)
-    
-    if os.path.dirname(output_midi_path) == '':
-        output_midi_path = os.path.join(output_dir, output_midi_path)
-    
     audio, sr = librosa.load(audio_path, sr=sr, mono=True)
 
     bpm = detect_bpm(audio, sr)
@@ -239,17 +232,13 @@ def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel
 
     instruments = classify_drum_segments(segments, sr, model, use_ensemble=use_ensemble)
 
-    base_filename = os.path.splitext(os.path.basename(audio_path))[0]
-    onset_dir = os.path.join(output_dir, f"{base_filename}_onsets")
-
     if save_onsets:
-        os.makedirs(onset_dir, exist_ok=True)
 
         for i, (segment, onset_time, instrument) in enumerate(zip(segments, onset_times, instruments)):
-            onset_file = os.path.join(onset_dir, f"onset_{i:03d}_{onset_time:.3f}s_{instrument}.wav")
+            onset_file = os.path.join(TESTING_ONSETS_PATH, f"onset_{i:03d}_{onset_time:.3f}s_{instrument}.wav")
             wavfile.write(onset_file, sr, (segment * 32767).astype(np.int16))
         
-        print(f"Saved {len(segments)} onset files to {onset_dir}/")
+        print(f"Saved {len(segments)} onset files to {TESTING_ONSETS_PATH}/")
 
 
     create_midi_file(onset_times, instruments, output_midi_path, bpm=bpm, velocities=velocities)
@@ -259,7 +248,7 @@ def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel
         "detected_instruments": set(instruments),
         "output_path": output_midi_path,
         "detected_bpm": bpm,
-        "onset_files_dir": onset_dir if save_onsets else None
+        "onset_files_dir": TESTING_ONSETS_PATH if save_onsets else None
     }
 
     return result
@@ -267,39 +256,38 @@ def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel
 
 if __name__ == "__main__":
 
-    audio_path = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrack7.wav"
-    output_dir = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrack7_output"
-    os.makedirs(output_dir, exist_ok=True)
+    audio_to_convert = "TestTrack7"
+    audio_to_convert_path = os.path.join(TO_CONVERT_PATH, f"{audio_to_convert}.wav")
+    converted_audio_output_dir = os.path.join(CONVERTED_PATH, f"{audio_to_convert}.mid")
 
     use_ensemble = True
     use_mel_model = False
 
     if use_ensemble:
         model_paths = [
-            os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth"),
-            os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth")
+            os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME),
+            os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
         ]
         model_types = ['mel', 'cqt']
         model = HeterogeneousEnsemble(model_paths, model_types)
     elif use_mel_model:
-        model_path = os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth")
+        model_path = os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME)
         model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
         model.load_state_dict(torch.load(model_path))
         model.eval()
     else:
-        model_path = os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth")
+        model_path = os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
         model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
         model.load_state_dict(torch.load(model_path))
         model.eval()
 
     
     result = convert_audio_to_midi(
-        audio_path=audio_path,
-        output_midi_path=os.path.join(output_dir, "TestTrack7.mid"),
+        audio_path=audio_to_convert_path,
+        output_midi_path=converted_audio_output_dir,
         model=model,
         use_mel_model=use_mel_model,
         use_ensemble=use_ensemble,
-        output_dir=output_dir,
         save_onsets=True
     )
 

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset, DataLoader
-from src.models.constants import GROOVE_MIDI_DATASET_PATH
+from src.constants import (GROOVE_MIDI_DATASET_PATH)
 from src.models.dl_classifiers.classifiers.cnn_classifier import SEBlock
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
