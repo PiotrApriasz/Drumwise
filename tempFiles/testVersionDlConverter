@@ -1,0 +1,1744 @@
+
+#
+# from src.models.constants import DRUM_INSTRUMENTS
+# from src.converters.conversion_utils import set_length, classify_instrument_dl
+#
+#
+# def test_adaptive_drum_onset_detection(audio, sr):
+#     """
+#     Simple drum onset detection following the approach in validation_sets_creator.py.
+#
+#     Args:
+#         audio: Audio signal
+#         sr: Sample rate
+#
+#     Returns:
+#         onset_times: Array of onset timestamps in seconds
+#     """
+#     # Basic librosa onset detection without many parameters
+#     # onset_frames = librosa.onset.onset_detect(
+#     #     y=audio,
+#     #     sr=sr,
+#     #     hop_length=512,
+#     #     delta=0.25,  # Slightly higher threshold to avoid over-detection
+#     #     wait=2       # Small wait time between consecutive onsets
+#     # )
+#     #
+#     # # Convert frames to time
+#     # onset_times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=512)
+#
+#     onset_frames = librosa.onset.onset_detect(y=audio, sr=sr)
+#     onset_times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=512)
+#
+#     return onset_times
+#
+# def adaptive_drum_onset_detection(audio, sr):
+#     """
+#     Highly enhanced drum onset detection with multiple specialized detectors.
+#
+#     Args:
+#         audio: Audio signal
+#         sr: Sample rate
+#
+#     Returns:
+#         onset_times: Array of onset timestamps in seconds
+#     """
+#     # Pre-processing: Normalize audio and enhance transients
+#     audio_norm = librosa.util.normalize(audio)
+#
+#     # 1. BASE ONSET DETECTOR - Default parameters but very sensitive
+#     onset_env_base = librosa.onset.onset_strength(
+#         y=audio_norm,
+#         sr=sr,
+#         hop_length=512,
+#         aggregate=np.max
+#     )
+#
+#     onset_frames_base = librosa.onset.onset_detect(
+#         onset_envelope=onset_env_base,
+#         sr=sr,
+#         hop_length=512,
+#         delta=0.03,  # Very low threshold to catch most onsets
+#         wait=2       # Minimal wait time
+#     )
+#
+#     # 2. ENVELOPE FOLLOWER - Better for detecting slow attacks
+#     # Calculate envelope
+#     envelope = np.abs(librosa.feature.rms(y=audio_norm, hop_length=512)[0])
+#     # Differentiate to find sudden changes
+#     diff_env = np.diff(envelope, prepend=[0])
+#     # Rectify to focus on attacks
+#     diff_env = np.maximum(0, diff_env)
+#     # Detect peaks in the differentiated envelope
+#     peak_indices = librosa.util.peak_pick(
+#         diff_env,
+#         pre_max=1,
+#         post_max=1,
+#         pre_avg=10,
+#         post_avg=10,
+#         delta=0.03,
+#         wait=1
+#     )
+#
+#     # 3. PERCUSSIVE COMPONENT DETECTION - Good for drum hits
+#     # Separate harmonic and percussive components
+#     y_harm, y_perc = librosa.effects.hpss(audio_norm)
+#     # Get onset envelope from percussive component
+#     onset_env_perc = librosa.onset.onset_strength(
+#         y=y_perc,
+#         sr=sr,
+#         hop_length=512,
+#         aggregate=np.max
+#     )
+#     onset_frames_perc = librosa.onset.onset_detect(
+#         onset_envelope=onset_env_perc,
+#         sr=sr,
+#         hop_length=512,
+#         delta=0.03,
+#         wait=2
+#     )
+#
+#     # 4. HIGH-FREQUENCY EMPHASIS - Better for hi-hats and cymbals
+#     # High-pass filter the audio to focus on high frequencies
+#     y_high = librosa.effects.preemphasis(audio_norm, coef=0.95)
+#     onset_env_high = librosa.onset.onset_strength(
+#         y=y_high,
+#         sr=sr,
+#         hop_length=512
+#     )
+#     onset_frames_high = librosa.onset.onset_detect(
+#         onset_envelope=onset_env_high,
+#         sr=sr,
+#         hop_length=512,
+#         delta=0.02,  # Even lower threshold for high frequencies
+#         wait=3
+#     )
+#
+#     # 5. LOW-FREQUENCY EMPHASIS - Better for kicks
+#     # Use a bandpass filter to isolate low frequencies
+#     y_filt = librosa.effects.preemphasis(audio_norm, coef=-0.8)  # Negative coef emphasizes low freq
+#     onset_env_low = librosa.onset.onset_strength(
+#         y=y_filt,
+#         sr=sr,
+#         hop_length=512
+#     )
+#     onset_frames_low = librosa.onset.onset_detect(
+#         onset_envelope=onset_env_low,
+#         sr=sr,
+#         hop_length=512,
+#         delta=0.05,
+#         wait=5  # Longer wait for low frequencies (kicks usually less frequent)
+#     )
+#
+#     # COMBINE ALL DETECTED FRAMES
+#     all_frames = np.concatenate([
+#         onset_frames_base,
+#         peak_indices,
+#         onset_frames_perc,
+#         onset_frames_high,
+#         onset_frames_low
+#     ])
+#
+#     # Convert to times
+#     all_times = librosa.frames_to_time(all_frames, sr=sr, hop_length=512)
+#
+#     # REMOVE DUPLICATES
+#     # Sort times
+#     all_times = np.sort(all_times)
+#     # Filter out onsets that are too close (within 30ms)
+#     min_separation = 0.03  # 30ms
+#     mask = np.concatenate([[True], np.diff(all_times) > min_separation])
+#     unique_times = all_times[mask]
+#
+#     return unique_times
+#
+#
+# def detect_beats_and_tempo(audio, sr):
+#     """
+#     Detect beat positions and tempo from audio.
+#
+#     Args:
+#         audio: Audio signal
+#         sr: Sample rate
+#
+#     Returns:
+#         beat_times: Array of beat timestamps in seconds
+#         tempo: Estimated tempo in BPM
+#         beat_subdivisions: Subdivided beat positions for finer quantization
+#     """
+#     # Run beat tracker
+#     tempo, beat_frames = librosa.beat.beat_track(y=audio, sr=sr, hop_length=512)
+#     beat_times = librosa.frames_to_time(beat_frames, sr=sr, hop_length=512)
+#
+#     # Create subdivisions for finer quantization
+#     subdivisions = []
+#     for i in range(len(beat_times) - 1):
+#         beat_duration = beat_times[i+1] - beat_times[i]
+#         # Add 1/4 and 1/8 note subdivisions
+#         quarter = beat_times[i] + beat_duration * 0.25
+#         eighth1 = beat_times[i] + beat_duration * 0.125
+#         eighth2 = beat_times[i] + beat_duration * 0.375
+#         eighth3 = beat_times[i] + beat_duration * 0.625
+#         eighth4 = beat_times[i] + beat_duration * 0.875
+#         half = beat_times[i] + beat_duration * 0.5
+#         three_quarters = beat_times[i] + beat_duration * 0.75
+#
+#         subdivisions.extend([
+#             beat_times[i],
+#             eighth1,
+#             quarter,
+#             eighth2,
+#             half,
+#             eighth3,
+#             three_quarters,
+#             eighth4
+#         ])
+#
+#     # Add last beat
+#     if len(beat_times) > 0:
+#         subdivisions.append(beat_times[-1])
+#
+#     return beat_times, tempo, sorted(subdivisions)
+#
+#
+# def quantize_onset_times(onset_times, beat_subdivisions, strength=0.75):
+#     """
+#     Quantize onset times to the nearest beat subdivision.
+#
+#     Args:
+#         onset_times: Array of onset timestamps in seconds
+#         beat_subdivisions: Array of beat and subdivision timestamps
+#         strength: Quantization strength (0.0 = no quantization, 1.0 = full quantization)
+#
+#     Returns:
+#         quantized_times: Array of quantized timestamps
+#     """
+#     if len(beat_subdivisions) == 0:
+#         return [float(t) for t in onset_times]  # Return original times as Python floats
+#
+#     quantized_times = []
+#
+#     for onset in onset_times:
+#         # Convert to float to ensure it's a Python native type
+#         onset = float(onset)
+#
+#         # Find the closest subdivision
+#         closest_idx = np.argmin(np.abs(np.array(beat_subdivisions) - onset))
+#         closest_beat = float(beat_subdivisions[closest_idx])  # Convert to Python float
+#
+#         # Apply quantization with specified strength
+#         quantized_time = onset + (closest_beat - onset) * strength
+#         quantized_times.append(float(quantized_time))  # Store as Python float
+#
+#     return quantized_times  # This is now a Python list of floats
+#
+#
+# def extract_drum_segments(audio, sr, onset_times, segment_duration=0.2):
+#     """
+#     Extract audio segments for each detected onset.
+#
+#     Args:
+#         audio: Audio signal
+#         sr: Sample rate
+#         onset_times: Array of onset timestamps in seconds
+#         segment_duration: Duration of each segment in seconds
+#
+#     Returns:
+#         segments: List of audio segments
+#     """
+#     segments = []
+#
+#     for onset_time in onset_times:
+#         # Calculate start and end sample indices
+#         start_sample = int(max(0, onset_time - 0.01) * sr)  # Capture a bit before onset
+#         end_sample = int(min(len(audio), start_sample + segment_duration * sr))
+#
+#         # Extract segment
+#         segment = audio[start_sample:end_sample]
+#         segment = set_length(segment, int(segment_duration * sr))
+#         segments.append(segment)
+#
+#     return segments
+#
+#
+# def classify_drum_segments(segments, sr, model):
+#     """
+#     Classify each drum segment.
+#
+#     Args:
+#         segments: List of audio segments
+#         sr: Sample rate
+#         model: Trained CNN classifier model
+#
+#     Returns:
+#         instruments: List of classified instrument names
+#     """
+#     instruments = []
+#     with tempfile.TemporaryDirectory() as temp_dir:
+#         for i, segment in enumerate(segments):
+#             temp_file = os.path.join(temp_dir, f"segment_{i}.wav")
+#             wavfile.write(temp_file, sr, (segment * 32767).astype(np.int16))
+#             instrument = classify_instrument_dl(temp_file, model)
+#             instruments.append(instrument)
+#
+#     return instruments
+#
+#
+# def create_midi_file(onset_times, instruments, output_path, tempo=120.0):
+#     """
+#     Create a MIDI file from onset times and classified instruments.
+#
+#     Args:
+#         onset_times: Array of onset timestamps in seconds
+#         instruments: List of classified instrument names
+#         output_path: Path to save the MIDI file
+#         tempo: Tempo in BPM
+#     """
+#     # Create a PrettyMIDI object
+#     midi = pretty_midi.PrettyMIDI(initial_tempo=tempo)
+#
+#     # Create a drum instrument object
+#     drum_track = pretty_midi.Instrument(program=0, is_drum=True, name="Drums")
+#
+#     # Map drum instruments to General MIDI drum map note numbers
+#     instrument_to_note = {
+#         "kick": 36,        # Bass Drum 1
+#         "snare": 38,       # Acoustic Snare
+#         "hi-hat": 42,      # Closed Hi-Hat
+#         "crash": 49,       # Crash Cymbal 1
+#         "ride": 51,        # Ride Cymbal 1
+#         "floor_tom": 41,   # Low Floor Tom
+#         "rack_tom": 45     # Low Tom
+#     }
+#
+#     # Add notes to the drum track
+#     for i, (onset_time, instrument) in enumerate(zip(onset_times, instruments)):
+#         if instrument in instrument_to_note:
+#             note_number = instrument_to_note[instrument]
+#             # Convert numpy values to Python native types
+#             start_time = float(onset_time)
+#             end_time = float(start_time + 0.1)  # Fixed note duration
+#
+#             # Set duration to 0.1 seconds (or adjust as needed)
+#             note = pretty_midi.Note(
+#                 velocity=100,
+#                 pitch=note_number,
+#                 start=start_time,
+#                 end=end_time
+#             )
+#             drum_track.notes.append(note)
+#
+#     # Add the drum track to the MIDI file
+#     midi.instruments.append(drum_track)
+#
+#     # Write the MIDI file
+#     midi.write(output_path)
+#
+#
+# def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, quantize_strength=0.75):
+#     """
+#     Convert audio file to MIDI using drum classification with advanced onset detection
+#     and beat quantization.
+#
+#     Args:
+#         audio_path: Path to the input audio file
+#         output_midi_path: Path to save the output MIDI file
+#         model: Trained CNN classifier model
+#         sr: Sample rate for audio processing
+#         quantize_strength: Strength of quantization (0.0 to 1.0)
+#     """
+#     # Load audio file
+#     audio, sr = librosa.load(audio_path, sr=sr, mono=True)
+#
+#     # 1. Detect beats and tempo
+#     beat_times, tempo, beat_subdivisions = detect_beats_and_tempo(audio, sr)
+#
+#     # 2. Use adaptive onset detection
+#     onset_times = test_adaptive_drum_onset_detection(audio, sr)
+#
+#     # 3. Quantize onsets to beat grid
+#     quantized_onsets = quantize_onset_times(onset_times, beat_subdivisions, strength=quantize_strength)
+#
+#     # Make absolutely sure we have Python floats, not NumPy types
+#     quantized_onsets = [float(t) for t in quantized_onsets]
+#     tempo = float(tempo)
+#
+#     # 4. Extract segments for each onset (using original onsets for better audio slicing)
+#     segments = extract_drum_segments(audio, sr, onset_times)
+#
+#     # 5. Classify each segment
+#     instruments = classify_drum_segments(segments, sr, model)
+#
+#     # 6. Create MIDI file with quantized timing and detected tempo
+#     create_midi_file(quantized_onsets, instruments, output_midi_path, tempo=tempo)
+#
+#     return {
+#         "num_hits": len(onset_times),
+#         "detected_instruments": set(instruments),
+#         "estimated_tempo": tempo,
+#         "output_path": output_midi_path
+#     }
+#
+
+
+
+
+
+# test drum detection onset cut code:
+
+import os
+import librosa
+import soundfile as sf
+import re
+
+from src.models.constants import DRUM_INSTRUMENTS
+
+INPUT_FOLDER = "/Users/piotrek/DataSets/IDMT-SMT-DRUMS-V2/audio"
+OUTPUT_FOLDER = "/Users/piotrek/DataSets/IDMT-SMT-DRUMS-V2/training"
+
+#SETS_INPUT_FOLDER = "/Users/piotrek/Developer/Drumwise/midiConverter/audio/sets"
+SETS_INPUT_FOLDER = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrackSet"
+#SETS_OUTPUT_FOLDER = "/Users/piotrek/Developer/Drumwise/midiConverter/audio"
+SETS_OUTPUT_FOLDER = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrackSet/samples"
+
+instrument_folders = {
+    "KD": "kick",
+    "SD": "snare",
+    "HH": "hi-hat"
+}
+
+INSTRUMENT_ORDER = [
+    "kick",
+    "hi-hat",
+    "snare",
+]
+
+def get_instrument(file_path: str):
+    file_name = os.path.basename(file_path)
+    set_number = 1
+
+    y, sr = librosa.load(file_path, sr=None, mono=True)
+
+    onset_frames = librosa.onset.onset_detect(y=y, sr=sr)
+    onset_samples = librosa.frames_to_samples(onset_frames)
+
+    onset_samples = list(onset_samples)
+    onset_samples.append(len(y))
+
+    if len(onset_samples) < 8:
+        print(f"WARNING: In file {file_name} there is no enough strikes, to cut out all instruments.")
+        print(f"    Found onsets: {len(onset_samples) - 1} (without end of the file).")
+        return
+
+    os.makedirs(SETS_OUTPUT_FOLDER, exist_ok=True)
+
+    # Define the 4-beat pattern where hi-hat alternates with kick and snare
+    drum_pattern = ["kick", "hi-hat", "snare", "hi-hat"]
+    pattern_length = len(drum_pattern)
+    
+    instrument_counts = {instrument: 0 for instrument in INSTRUMENT_ORDER}
+    
+    # Iterate through all detected onsets (except the last one which is the file end)
+    for i in range(len(onset_samples) - 1):
+        # Determine which instrument in the pattern this onset corresponds to
+        pattern_position = i % pattern_length
+        instrument_name = drum_pattern[pattern_position]
+        
+        # Increment the count for this instrument
+        instrument_counts[instrument_name] += 1
+        
+        # Get the audio segment between this onset and the next
+        start_sample = onset_samples[i]
+        end_sample = onset_samples[i + 1]
+        snippet = y[start_sample:end_sample]
+        
+        # Create filename with incremented number
+        out_file_name = f"{instrument_name}{instrument_counts[instrument_name]}.wav"
+        out_file_path = os.path.join(SETS_OUTPUT_FOLDER, out_file_name)
+        
+        sf.write(out_file_path, snippet, sr)
+        print(f"[{file_name}] Saved: {out_file_name}")
+
+def create_folder():
+    for inst_code, folder_name in instrument_folders.items():
+        out_path = os.path.join(OUTPUT_FOLDER, folder_name)
+        os.makedirs(out_path, exist_ok=True)
+
+def extract_instrument_code(file_name: str):
+    file_name_upper = file_name.upper()
+    if "KD" in file_name_upper:
+        return DRUM_INSTRUMENTS[4]
+    elif "SD" in file_name_upper:
+        return DRUM_INSTRUMENTS[0]
+    elif "HH" in file_name_upper:
+        return DRUM_INSTRUMENTS[3]
+    else:
+        return None
+
+
+def process_file(file_path: str):
+    file_name = os.path.basename(file_path)
+    instrument_folder = extract_instrument_code(file_name)
+
+    if not instrument_folder:
+        print(f"Instrument not found in: {file_name}")
+        return
+
+    y, sr = librosa.load(file_path, sr=None, mono=True)
+
+    onset_frames = librosa.onset.onset_detect(y=y, sr=sr)
+    onset_samples = librosa.frames_to_samples(onset_frames)
+
+    start_sample = onset_samples[0]
+
+    offset_in_samples = int(0.5 * sr)
+
+    end_sample = min(start_sample + offset_in_samples, len(y))
+
+    snippet = y[start_sample:end_sample]
+
+    out_dir = os.path.join(OUTPUT_FOLDER, instrument_folder)
+    os.makedirs(out_dir, exist_ok=True)
+
+    out_file_name = f"{os.path.splitext(file_name)[0]}_first_hit.wav"
+    out_file_path = os.path.join(out_dir, out_file_name)
+
+    sf.write(out_file_path, snippet, sr)
+    print(f"Saved: {out_file_path}")
+
+def main():
+    create_folder()
+
+    for file_name in os.listdir(INPUT_FOLDER):
+        if file_name.lower().endswith(('.wav', '.mp3', '.flac')):
+            file_path = os.path.join(INPUT_FOLDER, file_name)
+            process_file(file_path)
+
+def get_instruments():
+    for file_name in os.listdir(SETS_INPUT_FOLDER):
+        if file_name.lower().endswith((".wav", ".mp3", ".flac")):
+            file_path = os.path.join(SETS_INPUT_FOLDER, file_name)
+            get_instrument(file_path)
+
+if __name__ == "__main__":
+    #main()
+    get_instruments()
+
+
+
+# converter before changes
+
+import os
+import numpy as np
+import torch
+import librosa
+import pretty_midi
+import tempfile
+from scipy.io import wavfile
+
+from src.converters.conversion_utils import set_length, classify_instrument_dl_mel
+
+
+
+def detect_drum_onsets(audio, sr):
+    """
+    Simplified onset detection with aggressive filtering of closely spaced onsets.
+    """
+    # Basic onset detection
+    onset_frames = librosa.onset.onset_detect(
+        y=audio,
+        sr=sr,
+        hop_length=512,
+        delta=0.25,
+        wait=2
+    )
+
+    # Convert frames to time
+    onset_times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=512)
+
+    # Apply aggressive filtering to remove closely spaced onsets
+    filtered_onset_times = filter_closely_spaced_onsets(onset_times, min_distance=0.15)
+
+    # Check for onset at the beginning
+    first_energy = np.mean(np.abs(audio[:int(0.05*sr)]))
+    if first_energy > 0.05 and (len(filtered_onset_times) == 0 or filtered_onset_times[0] > 0.1):
+        filtered_onset_times = np.insert(filtered_onset_times, 0, 0)
+
+    return filtered_onset_times
+
+
+def extract_drum_segments(audio, sr, onset_times, segment_duration=0.2):
+    """
+    Extract very short audio segments to focus only on the attack portion of each drum hit.
+
+    Args:
+        audio: Audio signal
+        sr: Sample rate
+        onset_times: Array of onset timestamps in seconds
+        segment_duration: Duration of each segment in seconds (shortened to 0.2s)
+
+    Returns:
+        segments: List of audio segments
+        times: List of onset times
+    """
+    segments = []
+    times = []  # Keep original onset times for reference
+
+    for onset_time in onset_times:
+        # Calculate start and end sample indices
+        # Start exactly at the onset time (no pre-roll)
+        start_sample = int(onset_time * sr)
+        end_sample = int(min(len(audio), start_sample + segment_duration * sr))
+
+        # Skip if we're too close to the end of the file
+        if end_sample - start_sample < 0.05 * sr:  # At least 50ms of audio
+            continue
+
+        # Extract segment
+        segment = audio[start_sample:end_sample]
+        segment = set_length(segment, int(segment_duration * sr))
+        segments.append(segment)
+        times.append(onset_time)
+
+    return segments, times
+
+
+def filter_closely_spaced_onsets(onset_times, min_distance=0.15):
+    """
+    Filter out onsets that are too close together, keeping only the stronger ones.
+
+    Args:
+        onset_times: Array of onset times in seconds
+        min_distance: Minimum allowed distance between onsets in seconds
+
+    Returns:
+        filtered_onsets: Array of filtered onset times
+    """
+    if len(onset_times) <= 1:
+        return onset_times
+
+    # Sort onsets by time
+    sorted_onsets = np.sort(onset_times)
+
+    # Initialize list of onsets to keep
+    filtered_onsets = [sorted_onsets[0]]
+
+    # Filter out onsets that are too close to previously accepted onsets
+    for i in range(1, len(sorted_onsets)):
+        if sorted_onsets[i] - filtered_onsets[-1] >= min_distance:
+            filtered_onsets.append(sorted_onsets[i])
+
+    return np.array(filtered_onsets)
+
+
+def classify_drum_segments(segments, sr, model, use_ensemble=False, use_mel_model=False):
+    """
+    Classify each drum segment.
+
+    Args:
+        segments: List of audio segments
+        sr: Sample rate
+        model: Trained CNN classifier model or ensemble
+        use_ensemble: Whether to use ensemble prediction mode
+
+    Returns:
+        instruments: List of classified instrument names
+    """
+    instruments = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for i, segment in enumerate(segments):
+            temp_file = os.path.join(temp_dir, f"segment_{i}.wav")
+            wavfile.write(temp_file, sr, (segment * 32767).astype(np.int16))
+            instrument = classify_instrument_dl_mel(temp_file, model, use_ensemble=use_ensemble, use_mel_model=use_mel_model)
+            instruments.append(instrument)
+
+    return instruments
+
+
+def detect_bpm(audio, sr):
+    """
+    Detect the BPM (tempo) from audio signal.
+    
+    Args:
+        audio: Audio signal
+        sr: Sample rate
+        
+    Returns:
+        estimated_bpm: Estimated BPM (beats per minute)
+    """
+    # Use librosa's beat tracking to estimate tempo
+    onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
+    tempo, _ = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr)
+    
+    # Handle case where tempo is a numpy array
+    if isinstance(tempo, np.ndarray):
+        tempo = tempo.item()  # Convert single-element array to scalar
+    
+    # Round to nearest integer
+    estimated_bpm = round(tempo)
+    
+    # Sanity check - if BPM is unreasonably low or high, default to 120
+    if estimated_bpm < 60 or estimated_bpm > 200:
+        estimated_bpm = 120
+        
+    return estimated_bpm
+
+
+def create_midi_file(onset_times, instruments, output_path, bpm=120.0):
+    """
+    Create a MIDI file from onset times and classified instruments.
+
+    Args:
+        onset_times: Array of onset timestamps in seconds
+        instruments: List of classified instrument names
+        output_path: Path to save the MIDI file
+        bpm: Tempo in beats per minute (default: 120.0)
+    """
+    # Create a PrettyMIDI object with the detected BPM
+    midi = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+
+    # Create a drum instrument object
+    drum_track = pretty_midi.Instrument(program=0, is_drum=True, name="Drums")
+
+    # Map drum instruments to General MIDI drum map note numbers
+    instrument_to_note = {
+        "kick": 36,  # Bass Drum 1
+        "snare": 38,  # Acoustic Snare
+        "hi-hat": 42,  # Closed Hi-Hat
+        "crash": 49,  # Crash Cymbal 1
+        "ride": 51,  # Ride Cymbal 1
+        "floor_tom": 41,  # Low Floor Tom
+        "rack_tom": 50  # High Tom
+    }
+
+    # Add notes to the drum track
+    for i, (onset_time, instrument) in enumerate(zip(onset_times, instruments)):
+        if instrument in instrument_to_note:
+            note_number = instrument_to_note[instrument]
+            # Set duration to 0.1 seconds (or adjust as needed)
+            note = pretty_midi.Note(
+                velocity=100,
+                pitch=note_number,
+                start=onset_time,
+                end=onset_time + 0.1  # Fixed note duration
+            )
+            drum_track.notes.append(note)
+
+    # Add the drum track to the MIDI file
+    midi.instruments.append(drum_track)
+
+    # Write the MIDI file
+    midi.write(output_path)
+
+
+def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_ensemble=False, use_mel_model=False, save_onsets=False):
+    """
+    Convert audio file to MIDI using drum classification.
+
+    Args:
+        audio_path: Path to the input audio file
+        output_midi_path: Path to save the output MIDI file
+        model: Trained CNN classifier model or ensemble
+        sr: Sample rate for audio processing
+        use_ensemble: Whether to use ensemble prediction mode
+        use_mel_model: Whether to use mel-based model
+        save_onsets: Whether to save individual onset audio files for testing
+    """
+    # Load audio file
+    audio, sr = librosa.load(audio_path, sr=sr, mono=True)
+
+    # Detect BPM
+    bpm = detect_bpm(audio, sr)
+
+    # Detect onsets
+    onset_times = detect_drum_onsets(audio, sr)
+
+    # Extract segments for each onset
+    segments, onset_times = extract_drum_segments(audio, sr, onset_times)
+
+    # Classify each segment
+    instruments = classify_drum_segments(segments, sr, model, use_ensemble=use_ensemble, use_mel_model=use_mel_model)
+
+    # Save individual onset files if requested
+    if save_onsets:
+        # Create directory based on input filename
+        base_filename = os.path.splitext(os.path.basename(audio_path))[0]
+        onset_dir = f"{base_filename}_onsets"
+        os.makedirs(onset_dir, exist_ok=True)
+        
+        # Save each onset
+        for i, (segment, onset_time, instrument) in enumerate(zip(segments, onset_times, instruments)):
+            # Format filename with onset time and detected instrument
+            onset_file = os.path.join(onset_dir, f"onset_{i:03d}_{onset_time:.3f}s_{instrument}.wav")
+            # Save as WAV file
+            wavfile.write(onset_file, sr, (segment * 32767).astype(np.int16))
+        
+        print(f"Saved {len(segments)} onset files to {onset_dir}/")
+
+    # Create MIDI file with detected BPM
+    create_midi_file(onset_times, instruments, output_midi_path, bpm=bpm)
+
+    return {
+        "num_hits": len(onset_times),
+        "detected_instruments": set(instruments),
+        "output_path": output_midi_path,
+        "detected_bpm": bpm,
+        "onset_files_dir": onset_dir if save_onsets else None
+    }
+
+
+if __name__ == "__main__":
+    # Example usage
+    import torch
+    from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
+    from src.models.dl_classifiers.classifiers.ensemble_cnn_classifier import HeterogeneousEnsemble
+    from src.models.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH
+
+    # Choose whether to use ensemble model
+    use_ensemble = True  # Set to True to use ensemble model
+    use_mel_model = False
+
+    if use_ensemble:
+        # Create heterogeneous ensemble with both mel and CQT models
+        model_paths = [
+            os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth"),
+            os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth")
+        ]
+        model_types = ['mel', 'cqt']
+        model = HeterogeneousEnsemble(model_paths, model_types)
+    elif use_mel_model:
+        # Load single mel-based model
+        model_path = os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth")
+        model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+    else:
+        # Load single CQT-based model
+        model_path = os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth")
+        model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+
+
+    # Convert audio to MIDI
+    audio_path = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrack2.wav"
+    output_midi_path = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrack2.mid"
+
+    # Set save_onsets=True to save individual onset files for testing
+    result = convert_audio_to_midi(audio_path, output_midi_path, model, 
+                                 use_ensemble=use_ensemble, 
+                                 use_mel_model=use_mel_model,
+                                 save_onsets=True)  # Enable saving onset files
+
+    print(f"Conversion complete!")
+    print(f"Detected {result['num_hits']} drum hits")
+    print(f"Instruments found: {', '.join(result['detected_instruments'])}")
+    print(f"Detected BPM: {result['detected_bpm']}")
+    print(f"MIDI file saved to: {result['output_path']}")
+    if result['onset_files_dir']:
+        print(f"Onset audio files saved to: {result['onset_files_dir']}/")
+
+
+# ANOTHER VERSION WITH QUANTIZING END DRUMMING QUALITY
+
+import os
+import numpy as np
+import torch
+import librosa
+import pretty_midi
+import tempfile
+from scipy.io import wavfile
+
+from src.converters.conversion_utils import set_length, classify_instrument_dl_mel
+
+
+
+def detect_drum_onsets(audio, sr):
+    """
+    Custom multi-band drum onset detection optimized for capturing closely spaced hits.
+    """
+    # Split the signal into frequency bands relevant for different drum components
+    # Low (kick), mid (snare), high (hi-hats, cymbals)
+    y_harmonic, y_percussive = librosa.effects.hpss(audio)
+    
+    # Get onsets from percussive content with extremely sensitive settings
+    perc_onset_frames = librosa.onset.onset_detect(
+        y=y_percussive,
+        sr=sr,
+        hop_length=128,      # Very small hop for high time precision
+        delta=0.03,          # Extremely low threshold
+        wait=0,              # No wait time
+        pre_max=1,           # Minimal pre-max
+        post_max=1,          # Minimal post-max
+        pre_avg=1,           # Minimal pre-avg
+        post_avg=1           # Minimal post-avg
+    )
+    
+    # Get separate onset detection optimized for low frequencies (kicks)
+    y_low = librosa.effects.preemphasis(audio, coef=0.98)  # Reduce low frequency content
+    low_onset_frames = librosa.onset.onset_detect(
+        y=y_low,
+        sr=sr,
+        hop_length=128,
+        delta=0.08,
+        wait=1
+    )
+    
+    # Combine all detected onsets
+    all_onset_frames = np.unique(np.concatenate([perc_onset_frames, low_onset_frames]))
+    all_onset_frames.sort()
+    
+    # Convert frames to time
+    onset_times = librosa.frames_to_time(all_onset_frames, sr=sr, hop_length=128)
+    
+    # Minimal filtering - only remove physically impossible onsets
+    if len(onset_times) > 0:
+        filtered_times = [onset_times[0]]
+        for t in onset_times[1:]:
+            # Extremely permissive - allow hits as close as 25ms
+            if t - filtered_times[-1] >= 0.025:
+                filtered_times.append(t)
+        onset_times = np.array(filtered_times)
+    
+    # Check for onset at the beginning
+    first_energy = np.mean(np.abs(audio[:int(0.05*sr)]))
+    if first_energy > 0.05 and (len(onset_times) == 0 or onset_times[0] > 0.1):
+        onset_times = np.insert(onset_times, 0, 0)
+    
+    return onset_times
+
+
+def extract_drum_segments(audio, sr, onset_times, segment_duration=0.15):
+    """
+    Extract drum segments with adaptive duration - longer for isolated hits, shorter for rapid patterns.
+    
+    Args:
+        audio: Audio signal
+        sr: Sample rate
+        onset_times: Array of onset timestamps in seconds
+        segment_duration: Default duration of each segment in seconds
+    """
+    segments = []
+    times = []
+    
+    # Normalize audio
+    audio = librosa.util.normalize(audio)
+    
+    for i, onset_time in enumerate(onset_times):
+        # Calculate start sample with minimal pre-roll
+        start_sample = max(0, int(onset_time * sr) - int(0.005 * sr))  # 5ms pre-roll
+        
+        # Calculate segment duration based on next onset
+        if i < len(onset_times) - 1:
+            # Distance to next onset
+            next_onset = onset_times[i+1]
+            time_to_next = next_onset - onset_time
+            
+            # Adaptive segment duration strategy
+            if time_to_next < 0.1:  # Very close hits (rapid pattern)
+                # Short duration for very close hits
+                duration = min(0.08, time_to_next * 0.7)
+            elif time_to_next < 0.25:  # Moderately close hits
+                # Medium duration
+                duration = min(0.2, time_to_next * 0.8)
+            else:  # Isolated hit
+                # Longer duration to capture full decay, especially for kicks/snares
+                # For isolated hits, use a longer segment duration (up to 0.5s)
+                duration = min(0.5, time_to_next * 0.8)
+        else:
+            # For last onset, use longer duration (assume it's isolated)
+            duration = 0.5  # Capture full decay for last hit
+        
+        # Ensure minimum duration of 0.03s
+        duration = max(0.03, duration)
+        
+        # Calculate end sample
+        end_sample = min(len(audio), start_sample + int(duration * sr))
+        
+        # Extract segment
+        segment = audio[start_sample:end_sample]
+        
+        # Skip if segment is too short
+        if len(segment) < int(0.02 * sr):  # At least 20ms
+            continue
+        
+        # For isolated hits, don't truncate based on energy decay
+        # For close hits, truncate to avoid capturing the next hit
+        if i < len(onset_times) - 1 and onset_times[i+1] - onset_time < 0.2:
+            # Only analyze energy decay for closely spaced hits
+            if len(segment) > int(0.05 * sr):  # At least 50ms to analyze
+                # Calculate energy over time in small windows
+                frame_length = int(0.01 * sr)  # 10ms frames
+                energy = []
+                for j in range(0, len(segment) - frame_length, frame_length):
+                    energy.append(np.mean(segment[j:j+frame_length]**2))
+                
+                # If energy drops significantly after peak, truncate the segment
+                if len(energy) > 2:
+                    peak_idx = np.argmax(energy)
+                    if peak_idx < len(energy) - 1:
+                        # Look for significant drop after peak
+                        for j in range(peak_idx + 1, len(energy)):
+                            if energy[j] < 0.3 * energy[peak_idx]:
+                                # Truncate segment at this point
+                                new_length = min(len(segment), (j + 1) * frame_length)
+                                segment = segment[:new_length]
+                                break
+        
+        # Apply fade in/out to prevent clicks
+        fade_samples = int(0.003 * sr)  # 3ms fade
+        if len(segment) > 2 * fade_samples:
+            fade_in = np.linspace(0, 1, fade_samples)
+            fade_out = np.linspace(1, 0, fade_samples)
+            segment[:fade_samples] *= fade_in
+            segment[-fade_samples:] *= fade_out
+        
+        segments.append(segment)
+        times.append(onset_time)
+    
+    return segments, times
+
+
+def filter_closely_spaced_onsets(onset_times, min_distance=0.08):
+    """
+    Smarter filtering for drum onsets allowing rapid hi-hat patterns.
+    
+    Uses energy and spectral characteristics to decide when to keep closely spaced onsets.
+    """
+    if len(onset_times) <= 1:
+        return onset_times
+        
+    filtered_onsets = [onset_times[0]]
+    
+    for i in range(1, len(onset_times)):
+        current = onset_times[i]
+        previous = filtered_onsets[-1]
+        time_diff = current - previous
+        
+        # Always keep onsets that are sufficiently spaced
+        if time_diff >= min_distance:
+            filtered_onsets.append(current)
+        # For very close onsets, keep them if they appear to be different drum hits
+        # This would ideally analyze the spectral content, but as a simplification,
+        # we'll just keep every other close onset for now (typical for hi-hat patterns)
+        elif time_diff >= 0.03:  # At least 30ms apart for physically possible hits
+            filtered_onsets.append(current)
+            
+    return np.array(filtered_onsets)
+
+
+def classify_drum_segments(segments, sr, model, use_ensemble=False, use_mel_model=False):
+    """
+    Classify each drum segment.
+
+    Args:
+        segments: List of audio segments
+        sr: Sample rate
+        model: Trained CNN classifier model or ensemble
+        use_ensemble: Whether to use ensemble prediction mode
+
+    Returns:
+        instruments: List of classified instrument names
+    """
+    instruments = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for i, segment in enumerate(segments):
+            temp_file = os.path.join(temp_dir, f"segment_{i}.wav")
+            # Normalize before saving to ensure maximum dynamic range
+            normalized_segment = librosa.util.normalize(segment)
+            # Use float32 for better quality when testing
+            wavfile.write(temp_file, sr, (normalized_segment * 32767).astype(np.int16))
+            instrument = classify_instrument_dl_mel(temp_file, model, use_ensemble=use_ensemble, use_mel_model=use_mel_model)
+            instruments.append(instrument)
+
+    return instruments
+
+
+def detect_bpm(audio, sr):
+    """
+    Enhanced BPM detection optimized for drum patterns with multiple approaches.
+    
+    Args:
+        audio: Audio signal
+        sr: Sample rate
+        
+    Returns:
+        estimated_bpm: Estimated BPM (beats per minute)
+    """
+    # First approach: Use onset strength + beat tracking
+    onset_env = librosa.onset.onset_strength(y=audio, sr=sr, 
+                                            hop_length=512,
+                                            aggregate=np.median)
+    
+    # Get tempo using dynamic programming beat tracker
+    tempo_dp, beats_dp = librosa.beat.beat_track(onset_envelope=onset_env, 
+                                               sr=sr,
+                                               start_bpm=60,
+                                               tightness=100)
+    
+    # Second approach: Use percussive content for beat tracking
+    y_harmonic, y_percussive = librosa.effects.hpss(audio)
+    tempo_perc, beats_perc = librosa.beat.beat_track(y=y_percussive, 
+                                                  sr=sr,
+                                                  start_bpm=60,
+                                                  tightness=100)
+    
+    # Third approach: Use tempo estimation via autocorrelation
+    ac_tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=sr)[0]
+    
+    # Fourth approach: Use percussive-enhanced onset strength
+    perc_onset_env = librosa.onset.onset_strength(y=y_percussive, sr=sr)
+    perc_ac_tempo = librosa.beat.tempo(onset_envelope=perc_onset_env, sr=sr)[0]
+    
+    # Collect all tempo estimates
+    tempo_estimates = [tempo_dp, tempo_perc, ac_tempo, perc_ac_tempo]
+    
+    # Handle numpy arrays
+    tempo_estimates = [t.item() if isinstance(t, np.ndarray) else t for t in tempo_estimates]
+
+    
+    # Get the most likely tempo by finding the median and closest estimate to it
+    median_tempo = np.median(tempo_estimates)
+    closest_idx = np.argmin([abs(t - median_tempo) for t in tempo_estimates])
+    estimated_tempo = tempo_estimates[closest_idx]
+    
+    # Round to nearest integer
+    estimated_bpm = round(estimated_tempo)
+    
+    # Check if tempo is likely half or double the actual tempo
+    # Common issue with beat tracking on electronic music
+    if estimated_bpm > 170:
+        estimated_bpm = estimated_bpm / 2
+    elif estimated_bpm < 70:
+        estimated_bpm = estimated_bpm * 2
+    
+    # Final sanity check - if BPM is still unreasonable, default to 120
+    if estimated_bpm < 60 or estimated_bpm > 200:
+        estimated_bpm = 120
+        
+    return int(estimated_bpm)
+
+
+def detect_time_signature(audio, sr, bpm):
+    """
+    Attempt to detect time signature from audio.
+    
+    Args:
+        audio: Audio signal
+        sr: Sample rate
+        bpm: Detected tempo in BPM
+        
+    Returns:
+        time_sig: Tuple of (numerator, denominator) representing time signature
+    """
+    # Default to 4/4 time
+    default_time_sig = (4, 4)
+    
+    try:
+        # Get beat frames
+        onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
+        _, beats = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr, bpm=bpm)
+        
+        # Convert to times
+        beat_times = librosa.frames_to_time(beats, sr=sr)
+        
+        # Need at least 16 beats to attempt time signature detection
+        if len(beat_times) < 16:
+            return default_time_sig
+            
+        # Analyze intervals between beats to find patterns
+        beat_intervals = np.diff(beat_times)
+        
+        # Calculate the median beat interval
+        median_interval = np.median(beat_intervals)
+        
+        # Look for patterns in the first 16 beats
+        beat_strengths = [onset_env[beat] for beat in beats[:16]]
+        
+        # If first beat is significantly stronger, might be 4/4 or 3/4
+        if beat_strengths[0] > 1.5 * np.mean(beat_strengths[1:]):
+            # Look for pattern of strong beats
+            if len(beat_strengths) >= 12:
+                # Check for 3/4 pattern (stronger beat every 3)
+                three_pattern = beat_strengths[0::3]
+                four_pattern = beat_strengths[0::4]
+                
+                three_mean = np.mean(three_pattern)
+                four_mean = np.mean(four_pattern)
+                
+                other_beats_three = np.mean([beat_strengths[i] for i in range(len(beat_strengths)) if i % 3 != 0])
+                other_beats_four = np.mean([beat_strengths[i] for i in range(len(beat_strengths)) if i % 4 != 0])
+                
+                # If strong beat occurs every 3 beats, likely 3/4
+                if three_mean > four_mean and three_mean > 1.2 * other_beats_three:
+                    return (3, 4)
+        
+        # Default to 4/4 if no clear pattern
+        return default_time_sig
+    
+    except Exception as e:
+        print(f"Error detecting time signature: {e}")
+        return default_time_sig
+
+
+def quantize_times(times, bpm, grid_resolution=16, humanize_factor=0.0, time_sig=(4, 4)):
+    """
+    Quantize onset times to a musical grid with optional humanization.
+    
+    Args:
+        times: Array of onset timestamps in seconds
+        bpm: Tempo in beats per minute
+        grid_resolution: Grid resolution (4=quarter notes, 8=eighth notes, 16=16th notes, etc.)
+        humanize_factor: Amount of original timing to preserve (0.0=full quantization, 1.0=no quantization)
+        time_sig: Time signature as tuple (numerator, denominator)
+    
+    Returns:
+        quantized_times: Array of quantized timestamps in seconds
+    """
+    if not times.size:
+        return np.array([])
+    
+    # Calculate beat duration in seconds
+    beat_duration = 60.0 / bpm
+    
+    # Calculate the grid step in seconds
+    grid_step = (beat_duration * 4.0) / grid_resolution  # 4 beats per bar for 4/4
+    
+    # Create empty array for quantized times
+    quantized_times = np.zeros_like(times)
+    
+    for i, time in enumerate(times):
+        # Calculate the nearest grid position
+        grid_position = round(time / grid_step)
+        grid_time = grid_position * grid_step
+        
+        # Apply humanization if requested
+        if humanize_factor > 0:
+            # Blend between original and quantized times based on humanize factor
+            quantized_times[i] = grid_time + humanize_factor * (time - grid_time)
+        else:
+            quantized_times[i] = grid_time
+    
+    return quantized_times
+
+
+def get_grid_positions(times, bpm, grid_resolution=16, time_sig=(4, 4)):
+    """
+    Convert onset times to musical grid positions (bar.beat.tick format)
+    
+    Args:
+        times: Array of timestamps in seconds
+        bpm: Tempo in beats per minute
+        grid_resolution: Ticks per quarter note
+        time_sig: Time signature as tuple (numerator, denominator)
+    
+    Returns:
+        positions: List of strings in "bar.beat.tick" format
+    """
+    beat_duration = 60.0 / bpm
+    
+    # How many ticks in a quarter note
+    ticks_per_quarter = grid_resolution / 4
+    
+    # How many ticks in one beat (depends on time signature denominator)
+    ticks_per_beat = ticks_per_quarter * (4 / time_sig[1])
+    
+    # How many beats in a bar
+    beats_per_bar = time_sig[0]
+    
+    positions = []
+    for time in times:
+        # Convert time to ticks
+        total_ticks = time / beat_duration * ticks_per_quarter
+        
+        # Calculate bar, beat, tick
+        total_beats = total_ticks / ticks_per_beat
+        bar = int(total_beats / beats_per_bar) + 1  # Bars start at 1
+        beat_in_bar = int(total_beats % beats_per_bar) + 1  # Beats start at 1
+        tick = int(total_ticks % ticks_per_beat)
+        
+        positions.append(f"{bar}.{beat_in_bar}.{tick}")
+    
+    return positions
+
+
+def create_midi_file(onset_times, instruments, output_path, bpm=120.0, velocities=None, 
+                    quantize=False, grid_resolution=16, humanize_factor=0.0, time_sig=(4, 4)):
+    """
+    Create a MIDI file from onset times and classified instruments with optional quantization.
+
+    Args:
+        onset_times: Array of onset timestamps in seconds
+        instruments: List of classified instrument names
+        output_path: Path to save the MIDI file
+        bpm: Tempo in beats per minute
+        velocities: Optional list of velocity values for each note
+        quantize: Whether to quantize notes to a musical grid
+        grid_resolution: Grid resolution for quantization (4=quarter, 8=eighth, 16=16th notes)
+        humanize_factor: How much of original timing to preserve (0.0=full quantize, 1.0=no quantize)
+        time_sig: Time signature as tuple (numerator, denominator)
+    """
+    # Create a PrettyMIDI object with the detected BPM
+    midi = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+
+    # Create a drum instrument object
+    drum_track = pretty_midi.Instrument(program=0, is_drum=True, name="Drums")
+
+    # Map drum instruments to General MIDI drum map note numbers
+    instrument_to_note = {
+        "kick": 36,      # Bass Drum 1
+        "snare": 38,     # Acoustic Snare
+        "hi-hat": 42,    # Closed Hi-Hat
+        "crash": 49,     # Crash Cymbal 1
+        "ride": 51,      # Ride Cymbal 1
+        "floor_tom": 41, # Low Floor Tom
+        "rack_tom": 50   # High Tom
+    }
+
+    # Quantize onset times if requested
+    if quantize:
+        onset_times_array = np.array(onset_times)
+        quantized_times = quantize_times(onset_times_array, bpm, grid_resolution, 
+                                        humanize_factor, time_sig)
+        # Get musical positions for logging/debugging
+        grid_positions = get_grid_positions(quantized_times, bpm, grid_resolution, time_sig)
+        timing_source = quantized_times
+    else:
+        timing_source = onset_times
+        grid_positions = None
+
+    # Add notes to the drum track
+    for i, (time, instrument) in enumerate(zip(timing_source, instruments)):
+        if instrument in instrument_to_note:
+            note_number = instrument_to_note[instrument]
+            
+            # Use provided velocity or default to 100
+            velocity = velocities[i] if velocities is not None else 100
+            
+            # Set duration to 0.1 seconds (or adjust as needed)
+            note = pretty_midi.Note(
+                velocity=velocity,
+                pitch=note_number,
+                start=time,
+                end=time + 0.1  # Fixed note duration
+            )
+            drum_track.notes.append(note)
+
+    # Add the drum track to the MIDI file
+    midi.instruments.append(drum_track)
+
+    # Write the MIDI file
+    midi.write(output_path)
+    
+    return grid_positions
+
+
+def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_ensemble=False, 
+                         quantize=False, grid_resolution=16, humanize_factor=0.0, 
+                         time_sig=None, save_onsets=False, save_visualization=False,
+                         output_dir=None):
+    """
+    Convert audio file to MIDI using drum classification with optional quantization.
+
+    Args:
+        audio_path: Path to the input audio file
+        output_midi_path: Path to save the output MIDI file
+        model: Trained CNN classifier model or ensemble
+        sr: Sample rate for audio processing
+        use_ensemble: Whether to use ensemble prediction mode
+        quantize: Whether to quantize notes to a musical grid
+        grid_resolution: Grid resolution (4=quarter, 8=eighth, 16=16th notes)
+        humanize_factor: How much of original timing to preserve (0.0=full quantize, 1.0=no quantize)
+        time_sig: Time signature as tuple (numerator, denominator). If None, will attempt detection
+        save_onsets: Whether to save individual onset audio files for testing
+        save_visualization: Whether to save visualization of detected onsets and classifications
+        output_dir: Directory to save all output files
+    """
+    # If output directory is not specified, use the directory of output_midi_path
+    if output_dir is None:
+        output_dir = os.path.dirname(output_midi_path)
+    
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # If output_midi_path is just a filename without path, add the output directory
+    if os.path.dirname(output_midi_path) == '':
+        output_midi_path = os.path.join(output_dir, output_midi_path)
+    
+    # Load audio file
+    audio, sr = librosa.load(audio_path, sr=sr, mono=True)
+
+    # Detect BPM
+    bpm = detect_bpm(audio, sr)
+    
+    # Detect time signature if not provided
+    if time_sig is None:
+        time_sig = detect_time_signature(audio, sr, bpm)
+        print(f"Detected time signature: {time_sig[0]}/{time_sig[1]}")
+
+    # Detect onsets
+    onset_times = detect_drum_onsets(audio, sr)
+
+    # Extract segments for each onset
+    segments, onset_times = extract_drum_segments(audio, sr, onset_times)
+
+    # Calculate segment energies for velocity
+    velocities = []
+    for segment in segments:
+        # Calculate RMS energy and convert to MIDI velocity (0-127)
+        energy = np.sqrt(np.mean(segment**2))
+        # Scale to useful MIDI velocity range
+        velocity = min(127, max(40, int(energy * 100 * 127)))
+        velocities.append(velocity)
+
+    # Classify each segment
+    instruments = classify_drum_segments(segments, sr, model, use_ensemble=use_ensemble)
+
+    # Save individual onset files if requested
+    onset_dir = None
+    if save_onsets:
+        # Create directory based on input filename
+        base_filename = os.path.splitext(os.path.basename(audio_path))[0]
+        onset_dir = os.path.join(output_dir, f"{base_filename}_onsets")
+        os.makedirs(onset_dir, exist_ok=True)
+        
+        # Save each onset
+        for i, (segment, onset_time, instrument) in enumerate(zip(segments, onset_times, instruments)):
+            # Format filename with onset time and detected instrument
+            onset_file = os.path.join(onset_dir, f"onset_{i:03d}_{onset_time:.3f}s_{instrument}.wav")
+            # Save as WAV file
+            wavfile.write(onset_file, sr, (segment * 32767).astype(np.int16))
+        
+        print(f"Saved {len(segments)} onset files to {onset_dir}/")
+    
+    # Create visualization if requested
+    if save_visualization:
+        create_onset_visualization(audio_path, audio, sr, onset_times, instruments, velocities, bpm, output_dir=output_dir)
+
+    # Create MIDI file with detected BPM and optional quantization
+    grid_positions = create_midi_file(
+        onset_times, instruments, output_midi_path, bpm=bpm, velocities=velocities,
+        quantize=quantize, grid_resolution=grid_resolution, 
+        humanize_factor=humanize_factor, time_sig=time_sig
+    )
+    
+    # Analyze timing accuracy
+    timing_analysis = analyze_timing_accuracy(onset_times, instruments, bpm, time_sig)
+
+    # Prepare result info
+    result = {
+        "num_hits": len(onset_times),
+        "detected_instruments": set(instruments),
+        "output_path": output_midi_path,
+        "detected_bpm": bpm,
+        "time_signature": time_sig,
+        "onset_files_dir": onset_dir if save_onsets else None,
+        "timing_analysis": timing_analysis
+    }
+    
+    # Add quantization info if applicable
+    if quantize:
+        result["quantization"] = {
+            "grid_resolution": grid_resolution,
+            "humanize_factor": humanize_factor,
+            "time_signature": time_sig,
+            "grid_positions": grid_positions
+        }
+
+    return result
+
+
+def create_onset_visualization(audio_path, audio, sr, onset_times, instruments, velocities, bpm, output_dir=None):
+    """
+    Create visualization of detected onsets and classifications.
+    
+    Args:
+        audio_path: Path to the audio file
+        audio: Audio signal
+        sr: Sample rate
+        onset_times: Array of onset timestamps
+        instruments: List of classified instruments
+        velocities: List of velocity values
+        bpm: Detected tempo in BPM
+        output_dir: Directory to save the visualization
+    """
+    try:
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        from matplotlib.colors import to_rgba
+        
+        # Create output filename
+        base_filename = os.path.splitext(os.path.basename(audio_path))[0]
+        
+        if output_dir is None:
+            output_dir = os.path.dirname(audio_path)
+            
+        os.makedirs(output_dir, exist_ok=True)
+        output_image = os.path.join(output_dir, f"{base_filename}_analysis.png")
+        
+        # Set up the figure
+        plt.figure(figsize=(15, 8))
+        
+        # Plot waveform
+        plt.subplot(3, 1, 1)
+        plt.plot(librosa.times_like(audio, sr=sr), audio, color='gray', alpha=0.5)
+        plt.title(f"Waveform with Detected Onsets - BPM: {bpm}")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Amplitude")
+        
+        # Color map for different instruments
+        colors = {
+            "kick": "#FF0000",      # Red
+            "snare": "#00FF00",     # Green
+            "hi-hat": "#0000FF",    # Blue
+            "crash": "#FFFF00",     # Yellow
+            "ride": "#FF00FF",      # Magenta
+            "floor_tom": "#00FFFF", # Cyan
+            "rack_tom": "#FF8000"   # Orange
+        }
+        
+        # Plot onset markers with instrument colors
+        for t, instrument, velocity in zip(onset_times, instruments, velocities):
+            color = colors.get(instrument, "#808080")  # Default to gray if instrument not found
+            alpha = min(1.0, velocity / 127)  # Opacity based on velocity
+            plt.axvline(x=t, color=color, alpha=alpha, linewidth=2)
+        
+        # Create legend for instruments
+        patches = [mpatches.Patch(color=color, label=instr) for instr, color in colors.items() 
+                  if instr in set(instruments)]
+        plt.legend(handles=patches, loc='upper right')
+        
+        # Plot spectrogram
+        plt.subplot(3, 1, 2)
+        D = librosa.amplitude_to_db(np.abs(librosa.stft(audio)), ref=np.max)
+        librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='hz')
+        plt.colorbar(format='%+2.0f dB')
+        plt.title("Spectrogram")
+        
+        # Plot onset detection function
+        plt.subplot(3, 1, 3)
+        onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
+        frames = np.arange(len(onset_env))
+        t = librosa.frames_to_time(frames, sr=sr)
+        plt.plot(t, onset_env, alpha=0.8, label='Onset strength')
+        
+        # Plot onset detection threshold (estimated)
+        threshold = np.mean(onset_env) + 0.5 * np.std(onset_env)
+        plt.axhline(y=threshold, color='r', linestyle='--', alpha=0.5, label='Threshold')
+        
+        # Mark detected onsets
+        for t in onset_times:
+            frame = librosa.time_to_frames(t, sr=sr)
+            if 0 <= frame < len(onset_env):
+                plt.plot(t, onset_env[frame], 'ro', markersize=8)
+        
+        # Plot grid lines at each beat based on detected tempo
+        if bpm > 0:
+            beat_time = 60.0 / bpm
+            max_time = librosa.get_duration(y=audio, sr=sr)
+            beat_times = np.arange(0, max_time, beat_time)
+            for b in beat_times:
+                plt.axvline(x=b, color='g', linestyle=':', alpha=0.4)
+        
+        plt.title("Onset Strength with Detected Onsets")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Strength")
+        plt.legend()
+        
+        # Tight layout and save figure
+        plt.tight_layout()
+        plt.savefig(output_image, dpi=150)
+        plt.close()
+        
+        print(f"Visualization saved to {output_image}")
+        
+    except Exception as e:
+        print(f"Error creating visualization: {e}")
+
+
+def analyze_timing_accuracy(onset_times, instruments, bpm, time_sig=(4, 4)):
+    """
+    Analyze the timing accuracy of a drum performance.
+    
+    Args:
+        onset_times: Array of onset timestamps in seconds
+        instruments: List of instrument names for each onset
+        bpm: Tempo in BPM
+        time_sig: Time signature as tuple (numerator, denominator)
+        
+    Returns:
+        timing_analysis: Dictionary with timing metrics
+    """
+    # Calculate beat duration
+    beat_duration = 60.0 / bpm
+    
+    # Group onsets by instrument type
+    instrument_groups = {}
+    for i, (time, instrument) in enumerate(zip(onset_times, instruments)):
+        if instrument not in instrument_groups:
+            instrument_groups[instrument] = []
+        instrument_groups[instrument].append(time)
+    
+    # Metrics to calculate
+    metrics = {
+        "overall": {
+            "grid_deviation": 0.0,  # How far from perfect grid (0-100, lower is better)
+            "consistency": 0.0,     # How consistent the timing is (0-100, higher is better)
+            "rushing": 0.0,         # Tendency to play ahead (-100 to 100, 0 is neutral)
+            "dragging": 0.0         # Tendency to play behind (-100 to 100, 0 is neutral)
+        }
+    }
+    
+    # Calculate grid deviations for each instrument
+    for instrument, times in instrument_groups.items():
+        # Create a perfect grid based on the time signature
+        grid_times = []
+        for time in times:
+            # Find closest grid position (16th note resolution)
+            grid_step = beat_duration / 4  # 16th note
+            closest_grid = round(time / grid_step) * grid_step
+            grid_times.append(closest_grid)
+        
+        # Calculate deviations from grid
+        deviations = np.array([abs(a - b) for a, b in zip(times, grid_times)])
+        
+        # Calculate timing ahead/behind
+        timing_direction = np.array([a - b for a, b in zip(times, grid_times)])
+        
+        # Only keep deviations smaller than a 16th note
+        valid_deviations = deviations[deviations < beat_duration/4]
+        valid_directions = timing_direction[abs(timing_direction) < beat_duration/4]
+        
+        if len(valid_deviations) > 0:
+            # Convert to milliseconds for easier reading
+            avg_deviation_ms = np.mean(valid_deviations) * 1000
+            std_deviation_ms = np.std(valid_deviations) * 1000
+            
+            # Calculate metrics (0-100 scale)
+            # Grid deviation: 0ms = 100 score, 50ms = 0 score
+            grid_accuracy = max(0, 100 - (avg_deviation_ms * 2))
+            
+            # Consistency: 0ms std = 100 score, 25ms std = 0 score
+            consistency = max(0, 100 - (std_deviation_ms * 4))
+            
+            # Rushing/dragging: Average ms ahead/behind grid (-20ms to +20ms maps to -100 to +100)
+            avg_direction_ms = np.mean(valid_directions) * 1000
+            rushing_score = min(100, max(-100, avg_direction_ms * -5))
+            dragging_score = min(100, max(-100, avg_direction_ms * 5))
+            
+            # Store metrics for this instrument
+            metrics[instrument] = {
+                "grid_deviation": grid_accuracy,
+                "consistency": consistency,
+                "rushing": rushing_score if avg_direction_ms < 0 else 0.0,
+                "dragging": dragging_score if avg_direction_ms > 0 else 0.0,
+                "avg_deviation_ms": avg_deviation_ms,
+                "std_deviation_ms": std_deviation_ms,
+                "num_hits": len(times)
+            }
+            
+            # Update overall metrics (weighted by hit count)
+            for key in ["grid_deviation", "consistency"]:
+                metrics["overall"][key] += metrics[instrument][key] * len(times)
+            
+            if avg_direction_ms < 0:
+                metrics["overall"]["rushing"] += metrics[instrument]["rushing"] * len(times)
+            else:
+                metrics["overall"]["dragging"] += metrics[instrument]["dragging"] * len(times)
+    
+    # Calculate final overall scores
+    total_hits = len(onset_times)
+    if total_hits > 0:
+        for key in ["grid_deviation", "consistency"]:
+            metrics["overall"][key] /= total_hits
+        
+        # For rushing/dragging, only count the dominant tendency
+        if abs(metrics["overall"]["rushing"]) > abs(metrics["overall"]["dragging"]):
+            metrics["overall"]["dragging"] = 0
+        else:
+            metrics["overall"]["rushing"] = 0
+    
+    # Add a final timing score (weighted combination of grid accuracy and consistency)
+    metrics["overall"]["timing_score"] = 0.6 * metrics["overall"]["grid_deviation"] + 0.4 * metrics["overall"]["consistency"]
+    
+    return metrics
+
+
+if __name__ == "__main__":
+    # Example usage
+    import torch
+    from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
+    from src.models.dl_classifiers.classifiers.ensemble_cnn_classifier import HeterogeneousEnsemble
+    from src.models.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH
+
+    # Choose whether to use ensemble model
+    use_ensemble = True  # Set to True to use ensemble model
+
+    if use_ensemble:
+        # Create heterogeneous ensemble with both mel and CQT models
+        model_paths = [
+            os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth"),
+            os.path.join(TRAINED_DL_MODELS_PATH, "best_cnn_model.pth")
+        ]
+        model_types = ['mel', 'cqt']
+        model = HeterogeneousEnsemble(model_paths, model_types)
+    else:
+        # Load single mel-based model
+        model_path = os.path.join(TRAINED_DL_MODELS_PATH, "mel_best_cnn_model.pth")
+        model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+
+    # Convert audio to MIDI with quantization
+    audio_path = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrack7.wav"
+    output_dir = "/Users/piotrek/Developer/Drumwise/midiConverter/testAudio/TestTrack7_output"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    output_midi_path = os.path.join(output_dir, "TestTrack7_quantized.mid")
+
+    # Set quantization parameters
+    quantize = False
+    grid_resolution = 16  # 16th notes
+    humanize_factor = 0.2  # 20% of original timing preserved
+
+    result = convert_audio_to_midi(
+        audio_path, output_midi_path, model, 
+        use_ensemble=use_ensemble, 
+        quantize=quantize,
+        grid_resolution=grid_resolution,
+        humanize_factor=humanize_factor,
+        save_onsets=True,
+        save_visualization=True,
+        output_dir=output_dir  # Pass the output directory to the function
+    )
+
+    print(f"\nConversion complete!")
+    print(f"Detected {result['num_hits']} drum hits")
+    print(f"Instruments found: {', '.join(result['detected_instruments'])}")
+    print(f"Detected BPM: {result['detected_bpm']}")
+    print(f"Time Signature: {result['time_signature'][0]}/{result['time_signature'][1]}")
+    print(f"MIDI file saved to: {result['output_path']}")
+    
+    if quantize:
+        print(f"Quantized to {grid_resolution}th note grid with {humanize_factor*100}% humanization")
+    
+    if result['onset_files_dir']:
+        print(f"Onset audio files saved to: {result['onset_files_dir']}/")
+    
+    # Display timing analysis
+    timing = result['timing_analysis']
+    print("\nTiming Analysis:")
+    print(f"Overall timing score: {timing['overall']['timing_score']:.1f}/100")
+    
+    if timing['overall']['rushing'] != 0:
+        print(f"Performance tends to rush (play ahead of the beat): {abs(timing['overall']['rushing']):.1f}/100")
+    elif timing['overall']['dragging'] != 0:
+        print(f"Performance tends to drag (play behind the beat): {abs(timing['overall']['dragging']):.1f}/100")
+    
+    print("\nInstrument-specific timing:")
+    for instrument, metrics in timing.items():
+        if instrument != "overall":
+            print(f"  {instrument.capitalize()}:")
+            print(f"    Accuracy: {metrics['grid_deviation']:.1f}/100")
+            print(f"    Consistency: {metrics['consistency']:.1f}/100")
+            print(f"    Average deviation: {metrics['avg_deviation_ms']:.1f}ms")
