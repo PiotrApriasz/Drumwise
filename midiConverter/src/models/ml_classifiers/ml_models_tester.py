@@ -1,11 +1,10 @@
 import os
-import matplotlib.pyplot as plt
 import librosa
 import numpy as np
 import joblib
 
-from src.data.feature_extractor import extract_features_from_audio
-from src.data.dataset_loader import set_length
+from src.data.feature_extraction.standard_audio_feature_extractor import extract_features_from_audio
+from src.data.dataset.single_label_dataset_loader import set_length
 from src.models.constants import DRUM_INSTRUMENTS
 
 

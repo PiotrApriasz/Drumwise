@@ -2,11 +2,11 @@ import os
 
 import torch
 
-from src.converters.conversion_utils import extract_true_label, classify_instrument_dl_mel
+from src.converters.conversion_utils import extract_true_label, classify_instrument_dl
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME, CQT_BEST_CNN_MODEL_NAME, \
     CUTTED_VAL_SETS_PATH
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
-from src.models.dl_classifiers.classifiers.heterogeneous_cnn_classifier import HeterogeneousEnsemble
+from src.models.dl_classifiers.classifiers.heterogeneous_cnn_classifier import HeterogeneousCnnEnsemble
 
 if __name__ == "__main__":
     use_ensemble = True
@@ -17,7 +17,7 @@ if __name__ == "__main__":
             os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
         ]
         model_types = ['mel', 'cqt']
-        model = HeterogeneousEnsemble(model_paths, model_types)
+        model = HeterogeneousCnnEnsemble(model_paths, model_types)
     else:
         model_path = os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME)
         model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
@@ -36,7 +36,7 @@ if __name__ == "__main__":
             if true_label == "unknown":
                 continue
             audio_path = os.path.join(audio_files_path, file_name)
-            predicted_label = classify_instrument_dl_mel(audio_path, model, use_ensemble=use_ensemble)
+            predicted_label = classify_instrument_dl(audio_path, model, use_ensemble=use_ensemble)
             print(f"File: {file_name}")
             print(f"Predicted: {predicted_label}, True: {true_label}\n")
             total_count += 1

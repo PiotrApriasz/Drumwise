@@ -4,15 +4,15 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, confusion_matrix
-import librosa
 
+from src.data.feature_extraction.spectogram_generator import generate_mel_spectrogram, generate_cqt_spectrogram
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME
-from src.data.dataset_loader import load_dataset_with_splits
+from src.data.dataset.single_label_dataset_loader import load_dataset_with_splits
 from src.models.dl_classifiers.dl_dataset_creator import CqtDrumDataset
 
 
-class HeterogeneousEnsemble:
+class HeterogeneousCnnEnsemble:
     def __init__(self, model_paths, model_types, device=None):
         self.models = []
         self.model_types = model_types
@@ -27,19 +27,10 @@ class HeterogeneousEnsemble:
     
     def preprocess_audio(self, audio, sr=22050, model_type='cqt'):
         if model_type == 'mel':
-            mel_spec = librosa.feature.melspectrogram(
-                y=audio, 
-                sr=sr, 
-                n_mels=256,
-                hop_length=256,
-                n_fft=2048
-            )
-            mel_db = librosa.power_to_db(mel_spec, ref=np.max)
+            mel_db = generate_mel_spectrogram(y=audio, sr=sr)
             return torch.tensor(mel_db, dtype=torch.float).unsqueeze(0)
         else:
-            cqt = librosa.cqt(audio, sr=sr, hop_length=512)
-            cqt_mag = np.abs(cqt)
-            cqt_db = librosa.amplitude_to_db(cqt_mag, ref=np.max)
+            cqt_db = generate_cqt_spectrogram(y=audio, sr=sr)
             return torch.tensor(cqt_db, dtype=torch.float).unsqueeze(0)
     
     def predict(self, audio, sr=22050):
@@ -88,7 +79,7 @@ class HeterogeneousEnsemble:
 
 
 def evaluate_ensemble(model_paths):
-    ensemble = HeterogeneousEnsemble(model_paths, model_types=['cqt'] * len(model_paths))
+    ensemble = HeterogeneousCnnEnsemble(model_paths, model_types=['cqt'] * len(model_paths))
 
     label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
     _, _, test_data = load_dataset_with_splits()
@@ -147,7 +138,7 @@ def train_ensemble(num_models=3):
 
 def compare_ensemble_vs_single(ensemble_paths, single_model_path, device=None):
 
-    ensemble = HeterogeneousEnsemble(ensemble_paths, model_types=['cqt'] * len(ensemble_paths))
+    ensemble = HeterogeneousCnnEnsemble(ensemble_paths, model_types=['cqt'] * len(ensemble_paths))
 
     
     single_model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-from src.data.dataset_loader import load_dataset_with_splits
+from src.data.dataset.single_label_dataset_loader import load_dataset_with_splits
 from src.constants import DRUM_INSTRUMENTS
 from src.models.dl_classifiers.classifiers.cnn_classifier import create_augmented_dataset, CqtDrumDataset, SEBlock
 

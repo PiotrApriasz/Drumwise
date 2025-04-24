@@ -4,8 +4,8 @@ import joblib
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
-from src.data.dataset_loader import load_dataset_with_splits
-from src.data.feature_extractor import extract_features
+from src.data.dataset.single_label_dataset_loader import load_dataset_with_splits
+from src.data.feature_extraction.standard_audio_feature_extractor import extract_features
 from src.models.constants import TRAINED_ML_MODELS_PATH
 
 
