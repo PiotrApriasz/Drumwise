@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.constants import DRUM_INSTRUMENTS
+from src.constants import DRUM_INSTRUMENTS, CNN_DROPOUT_RATE
 from src.models.dl_classifiers.classifiers.base_classifier import BaseClassifier
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
@@ -23,16 +23,16 @@ class SEBlock(nn.Module):
 
 
 class DrumCNN(nn.Module):
-    def __init__(self, num_classes=7):
+    def __init__(self, num_classes=7, num_filters1=16, num_filters2=32, dropout_rate=CNN_DROPOUT_RATE):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.se1 = SEBlock(32)
+        self.conv1 = nn.Conv2d(1, num_filters1, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(num_filters1)
+        self.conv2 = nn.Conv2d(num_filters1, num_filters2, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(num_filters2)
+        self.se1 = SEBlock(num_filters2)
         self.pool = nn.MaxPool2d(2, 2)
 
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(num_filters2, 64, kernel_size=3, padding=1)
         self.bn3 = nn.BatchNorm2d(64)
         self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.bn4 = nn.BatchNorm2d(128)
@@ -40,7 +40,7 @@ class DrumCNN(nn.Module):
 
         self.adapool = nn.AdaptiveMaxPool2d((15, 7))
         self.fc1 = nn.Linear(128 * 15 * 7, 128)
-        self.dropout = nn.Dropout(0.287)
+        self.dropout = nn.Dropout(dropout_rate)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
@@ -64,14 +64,22 @@ class DrumCNN(nn.Module):
 class DrumCNNClassifier(BaseClassifier):
     """CNN Classifier for Drum Sounds, using the BaseClassifier for training."""
 
-    def __init__(self, feature_type='cqt', sr=22050, batch_size=8, num_workers=4):
+    def __init__(self, feature_type='cqt', sr=22050, batch_size=8, num_workers=4,
+                 num_filters1=16, num_filters2=32, dropout_rate=CNN_DROPOUT_RATE):
+        self.num_filters1 = num_filters1
+        self.num_filters2 = num_filters2
+        self.dropout_rate = dropout_rate
+
         super().__init__(num_classes=len(DRUM_INSTRUMENTS), sr=sr,
                          feature_type=feature_type, batch_size=batch_size,
                          num_workers=num_workers)
 
     def _build_model(self) -> nn.Module:
         print("Building DrumCNN model...")
-        return DrumCNN(num_classes=self.num_classes)
+        return DrumCNN(num_classes=self.num_classes,
+                       num_filters1=self.num_filters1,
+                       num_filters2=self.num_filters2,
+                       dropout_rate=self.dropout_rate)
 
 
 # def train_cnn_classifier(model_path, best_model_path, train_with_mel=False):

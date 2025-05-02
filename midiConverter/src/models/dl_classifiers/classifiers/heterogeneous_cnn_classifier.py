@@ -8,8 +8,6 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 from src.data.feature_extraction.spectogram_generator import generate_mel_spectrogram, generate_cqt_spectrogram
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME
-from src.data.dataset.single_label_dataset_loader import load_dataset_with_splits
-from src.models.dl_classifiers.dl_dataset_creator import CqtDrumDataset
 
 
 class HeterogeneousCnnEnsemble:
