@@ -60,17 +60,17 @@ def train_and_evaluate_model(args):
 
     print("Loading configuration...")
 
-    epochs = args.epochs if args.epochs is not None else EPOCHS
-    patience = args.patience if args.patience is not None else PATIENCE
-    batch_size = args.batch_size if args.batch_size is not None else BATCH_SIZE
-    num_workers = args.num_workers if args.num_workers is not None else NUM_WORKERS
-    augment_factor = args.augment_factor if args.augment_factor is not None else AUGUMENT_FACTOR
+    epochs = args.epochs if args.epochs is not None else int(EPOCHS)
+    patience = args.patience if args.patience is not None else int(PATIENCE)
+    batch_size = args.batch_size if args.batch_size is not None else int(BATCH_SIZE)
+    num_workers = args.num_workers if args.num_workers is not None else int(NUM_WORKERS)
+    augment_factor = args.augment_factor if args.augment_factor is not None else int(AUGUMENT_FACTOR)
 
     # Model-specific hyperparameters
     if MODEL_TYPE == 'cnn':
-        lr = args.lr if args.lr is not None else CNN_LEARNING_RATE
-        weight_decay = args.weight_decay if args.weight_decay is not None else CNN_WEIGHT_DECAY
-        label_smoothing = args.label_smoothing if args.label_smoothing is not None else CNN_LABEL_SMOOTHING
+        lr = args.lr if args.lr is not None else float(CNN_LEARNING_RATE)
+        weight_decay = args.weight_decay if args.weight_decay is not None else float(CNN_WEIGHT_DECAY)
+        label_smoothing = args.label_smoothing if args.label_smoothing is not None else float(CNN_LABEL_SMOOTHING)
 
     try:
         FINAL_MODEL_PATH, BEST_MODEL_PATH = get_model_paths(MODEL_TYPE, FEATURE_TYPE)

@@ -2,7 +2,7 @@ import librosa
 import numpy as np
 
 
-def generate_mel_spectrogram(y, sr=22050, n_fft=2048, hop_length=256, n_mels=256):
+def generate_mel_spectrogram(y, sr=22050, n_fft=2048, hop_length=512, n_mels=128):
     mel_spectrogram = librosa.feature.melspectrogram(y=y,
                                                      sr=sr,
                                                      n_fft=n_fft,

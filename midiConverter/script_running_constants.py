@@ -1,0 +1,2 @@
+RUN_CNN_CQT_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type cnn --feature-type cqt"
+RUN_CNN_MEL_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type cnn --feature-type mel"

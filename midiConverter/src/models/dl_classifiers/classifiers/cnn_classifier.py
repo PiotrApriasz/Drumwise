@@ -40,7 +40,7 @@ class DrumCNN(nn.Module):
 
         self.adapool = nn.AdaptiveMaxPool2d((15, 7))
         self.fc1 = nn.Linear(128 * 15 * 7, 128)
-        self.dropout = nn.Dropout(dropout_rate)
+        self.dropout = nn.Dropout(float(dropout_rate))
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):

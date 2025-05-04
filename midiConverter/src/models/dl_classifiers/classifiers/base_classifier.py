@@ -117,9 +117,12 @@ class BaseClassifier(nn.Module, ABC):
 
     def _create_dataloaders(self, train_dataset, val_dataset, test_dataset):
         """Creates DataLoaders for the datasets."""
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
-        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True,
+                                  num_workers=self.num_workers) if train_dataset is not None else None
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False,
+                                num_workers=self.num_workers) if val_dataset is not None else None
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False,
+                                 num_workers=self.num_workers) if test_dataset is not None else None
         return train_loader, val_loader, test_loader
 
     def _train_epoch(self, train_loader, optimizer, criterion):
