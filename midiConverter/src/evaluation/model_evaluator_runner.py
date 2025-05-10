@@ -8,7 +8,7 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report, precision_recall_fscore_support
 from pathlib import Path
 
-from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, SIMPLE_EVALUATION_RESULTS_PATH
+from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, EVALUATION_RESULTS_PATH
 from src.converters.conversion_utils import extract_true_label, classify_instrument_dl
 
 
@@ -250,7 +250,7 @@ def save_evaluation_results(results, model_type, feature_type, eval_type):
     from datetime import datetime
     import numpy as np
 
-    os.makedirs(SIMPLE_EVALUATION_RESULTS_PATH, exist_ok=True)
+    os.makedirs(EVALUATION_RESULTS_PATH, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_filename = f"{model_type}_{feature_type}_{eval_type}_eval_{timestamp}"
@@ -274,12 +274,12 @@ def save_evaluation_results(results, model_type, feature_type, eval_type):
     if 'confusion_matrix' in results:
         results_to_save['confusion_matrix'] = convert_numpy_types(results['confusion_matrix'])
 
-    json_path = os.path.join(SIMPLE_EVALUATION_RESULTS_PATH, f"{base_filename}.json")
+    json_path = os.path.join(EVALUATION_RESULTS_PATH, f"{base_filename}.json")
     with open(json_path, 'w') as f:
         json.dump(results_to_save, f, indent=2)
 
     if 'confusion_matrix' in results:
-        cm_path = os.path.join(SIMPLE_EVALUATION_RESULTS_PATH, f"{base_filename}_cm.png")
+        cm_path = os.path.join(EVALUATION_RESULTS_PATH, f"{base_filename}_cm.png")
         title = f"{model_type.upper()} - {feature_type.upper()} Confusion Matrix ({eval_type})"
         visualize_confusion_matrix(
             results['confusion_matrix'],

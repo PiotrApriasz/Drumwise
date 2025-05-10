@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 from abc import ABC, abstractmethod
 from sklearn.metrics import confusion_matrix
 import os
+import time  # Added for timing
 
 from src.data.dataset.dataset_augumentation import create_augmented_dataset
 from src.data.feature_extraction.spectogram_generator import generate_cqt_spectrogram, generate_mel_spectrogram
@@ -12,10 +13,12 @@ from src.data.dataset.single_label_dataset_loader import load_dataset_with_split
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
 
+
 # --- Dataset Classes ---
 
 class BaseDrumDataset(Dataset):
     """Base dataset class for drum sounds."""
+
     def __init__(self, data, label_map, sr=22050):
         self.data = data
         self.sr = sr
@@ -23,8 +26,8 @@ class BaseDrumDataset(Dataset):
         if not data:
             print("Warning: Initializing BaseDrumDataset with empty data.")
         elif not isinstance(data[0], (tuple, list)) or len(data[0]) != 2:
-             print(f"Warning: Data format might be incorrect. Expected list of (audio, label_str), got first element: {data[0]}")
-
+            print(
+                f"Warning: Data format might be incorrect. Expected list of (audio, label_str), got first element: {data[0]}")
 
     def __len__(self):
         return len(self.data)
@@ -39,12 +42,14 @@ class BaseDrumDataset(Dataset):
             raise IndexError(f"Index {idx} out of bounds for dataset with length {len(self.data)}")
         audio, label_str = self.data[idx]
         if label_str not in self.label_map:
-             raise ValueError(f"Label '{label_str}' not found in label_map: {self.label_map.keys()}")
+            raise ValueError(f"Label '{label_str}' not found in label_map: {self.label_map.keys()}")
         label = self.label_map[label_str]
         return audio, label
 
+
 class CqtDrumDataset(BaseDrumDataset):
     """Dataset generating CQT spectrograms."""
+
     def __getitem__(self, idx):
         audio, label = self._get_base_item(idx)
         cqt_db = generate_cqt_spectrogram(y=audio, sr=self.sr)
@@ -52,14 +57,17 @@ class CqtDrumDataset(BaseDrumDataset):
         y = torch.tensor(label, dtype=torch.long)
         return x, y
 
+
 class MelDrumDataset(BaseDrumDataset):
     """Dataset generating Mel spectrograms."""
+
     def __getitem__(self, idx):
         audio, label = self._get_base_item(idx)
         mel_db = generate_mel_spectrogram(y=audio, sr=self.sr)
         x = torch.tensor(mel_db, dtype=torch.float).unsqueeze(0)
         y = torch.tensor(label, dtype=torch.long)
         return x, y
+
 
 # --- Abstract Base Classifier ---
 
@@ -95,17 +103,15 @@ class BaseClassifier(nn.Module, ABC):
         else:
             raise ValueError("Invalid feature_type specified.")
 
-
     def _create_datasets(self, augment_factor=2):
         """Loads raw data and creates train, validation, and test datasets."""
         train_data, val_data, test_data = load_dataset_with_splits()
         if augment_factor > 0:
-             print(f"Creating augmented dataset with factor {augment_factor}...")
-             train_data_aug = create_augmented_dataset(train_data, sr=self.sr, augment_factor=augment_factor)
+            print(f"Creating augmented dataset with factor {augment_factor}...")
+            train_data_aug = create_augmented_dataset(train_data, sr=self.sr, augment_factor=augment_factor)
         else:
-             train_data_aug = train_data
-             print("Skipping augmentation.")
-
+            train_data_aug = train_data
+            print("Skipping augmentation.")
 
         DatasetClass = self._get_dataset_class()
         train_dataset = DatasetClass(train_data_aug, self.label_map, sr=self.sr)
@@ -129,6 +135,7 @@ class BaseClassifier(nn.Module, ABC):
         """Runs a single training epoch."""
         self.model.train()
         train_loss = 0
+        epoch_start_time = time.time()
         for x_batch, y_batch in train_loader:
             optimizer.zero_grad()
             outputs = self.model(x_batch)
@@ -136,7 +143,9 @@ class BaseClassifier(nn.Module, ABC):
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-        return train_loss / len(train_loader)
+        epoch_end_time = time.time()
+        epoch_duration = epoch_end_time - epoch_start_time
+        return train_loss / len(train_loader), epoch_duration
 
     def _evaluate(self, data_loader, criterion):
         """Evaluates the model on a given dataloader."""
@@ -144,13 +153,17 @@ class BaseClassifier(nn.Module, ABC):
         total_loss = 0
         correct = 0
         total = 0
-        all_preds = []
         all_labels = []
+        all_preds = []
+        all_outputs = []
         with torch.no_grad():
             for x_batch, y_batch in data_loader:
                 outputs = self.model(x_batch)
                 loss = criterion(outputs, y_batch)
                 total_loss += loss.item()
+
+                all_outputs.extend(outputs.cpu().numpy())
+
                 preds = outputs.argmax(dim=1)
                 correct += (preds == y_batch).sum().item()
                 total += y_batch.size(0)
@@ -159,7 +172,7 @@ class BaseClassifier(nn.Module, ABC):
 
         avg_loss = total_loss / len(data_loader)
         accuracy = correct / total if total > 0 else 0
-        return avg_loss, accuracy, all_labels, all_preds
+        return avg_loss, accuracy, all_labels, all_preds, all_outputs
 
     def train_model(self, save_path, best_model_save_path, optimizer, criterion, scheduler=None,
                     epochs=50, patience=6, augment_factor=2):
@@ -175,37 +188,43 @@ class BaseClassifier(nn.Module, ABC):
         train_losses = []
         val_losses = []
         val_accs = []
+        epoch_times = []
 
         for epoch in range(epochs):
-            train_loss = self._train_epoch(train_loader, optimizer, criterion)
+            train_loss, epoch_duration = self._train_epoch(train_loader, optimizer, criterion)
             train_losses.append(train_loss)
+            epoch_times.append(epoch_duration)
 
-            val_loss, val_acc, _, _ = self._evaluate(val_loader, criterion)
+            val_loss, val_acc, _, _, _ = self._evaluate(val_loader, criterion)
             val_losses.append(val_loss)
             val_accs.append(val_acc)
 
-            print(f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+            print(
+                f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Epoch Time: {epoch_duration:.2f}s")
 
             if scheduler:
                 if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                     scheduler.step(val_loss)
+                    scheduler.step(val_loss)
                 else:
-                     scheduler.step()
+                    scheduler.step()
 
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 torch.save(self.model.state_dict(), best_model_save_path)
                 print(f"Saved best model (Val Acc: {best_val_acc:.4f}) to {best_model_save_path}")
-                epochs_no_improve = 0 # Reset counter if accuracy improves
+                epochs_no_improve = 0
 
             if val_loss < best_val_loss:
-                 best_val_loss = val_loss
-            if val_acc <= best_val_acc:
-                 epochs_no_improve += 1
-                 print(f"Epochs without validation accuracy improvement: {epochs_no_improve}/{patience}")
-                 if epochs_no_improve >= patience:
-                     print(f"Early stopping triggered after {epoch + 1} epochs.")
-                     break
+                best_val_loss = val_loss
+            if val_acc <= best_val_acc and epoch > 0:
+                epochs_no_improve += 1
+            else:
+                epochs_no_improve = 0
+
+            print(f"Epochs without validation accuracy improvement: {epochs_no_improve}/{patience}")
+            if epochs_no_improve >= patience:
+                print(f"Early stopping triggered after {epoch + 1} epochs.")
+                break
 
         print(f"Training finished. Best validation accuracy: {best_val_acc:.4f}")
 
@@ -217,7 +236,8 @@ class BaseClassifier(nn.Module, ABC):
             "train_losses": train_losses,
             "val_losses": val_losses,
             "val_accs": val_accs,
-            "best_val_acc": best_val_acc
+            "best_val_acc": best_val_acc,
+            "epoch_times": epoch_times
         }
 
     def evaluate_model(self, model_path, criterion):
@@ -228,7 +248,7 @@ class BaseClassifier(nn.Module, ABC):
         _, _, test_dataset = self._create_datasets(augment_factor=0)
         _, _, test_loader = self._create_dataloaders(None, None, test_dataset)
 
-        test_loss, test_acc, all_labels, all_preds = self._evaluate(test_loader, criterion)
+        test_loss, test_acc, all_labels, all_preds, all_outputs = self._evaluate(test_loader, criterion)
 
         cm = confusion_matrix(all_labels, all_preds)
         class_names = list(DRUM_INSTRUMENTS)
@@ -248,5 +268,6 @@ class BaseClassifier(nn.Module, ABC):
             "test_acc": test_acc,
             "confusion_matrix": cm,
             "labels": all_labels,
-            "predictions": all_preds
+            "predictions": all_preds,
+            "outputs": all_outputs
         }
