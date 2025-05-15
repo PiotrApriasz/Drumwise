@@ -1,3 +1,6 @@
+import datetime
+import json
+
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -8,6 +11,8 @@ import sys
 
 from src import constants
 from src.constants import *
+from src.evaluation.model_evaluator_runner import convert_numpy_types
+
 
 def get_classifier_class(model_type: str):
     """Dynamically imports and returns the classifier class based on model_type."""
@@ -155,6 +160,24 @@ def train_and_evaluate_model(args):
         print(f"\nError during evaluation: {e}")
         import traceback
         traceback.print_exc()
+
+    # --- Saving Training History ---
+    if 'train_history' in locals() and train_history:
+        try:
+            training_history_filename = f"{MODEL_TYPE}_{FEATURE_TYPE}_training_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            training_history_path = os.path.join(EVALUATION_RESULTS_PATH,
+                                                 training_history_filename)
+
+            history_to_save = convert_numpy_types(train_history)
+
+            with open(training_history_path, 'w') as f:
+                json.dump(history_to_save, f, indent=2)
+            print(f"Training history saved to: {training_history_path}")
+        except Exception as e:
+            print(f"\nError saving training history: {e}")
+            import traceback
+            traceback.print_exc()
+
 
 # --- Main execution block with argparse ---
 if __name__ == "__main__":

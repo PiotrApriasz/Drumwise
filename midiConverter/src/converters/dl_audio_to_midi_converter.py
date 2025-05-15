@@ -9,7 +9,7 @@ import torch
 from src.data.onset_detection.onset_detector import detect_drum_onsets
 from src.data.onset_detection.onset_processor import extract_drum_segments
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
-from src.models.dl_classifiers.classifiers.heterogeneous_cnn_classifier import HeterogeneousCnnEnsemble
+from src.models.dl_classifiers.classifiers.cnn_mel_cqt_ensemble_classifier import CnnMelCqtEnsemble
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, TO_CONVERT_PATH, MEL_BEST_CNN_MODEL_NAME, \
     CQT_BEST_CNN_MODEL_NAME, TESTING_ONSETS_PATH, CONVERTED_PATH
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
             os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
         ]
         model_types = ['mel', 'cqt']
-        model = HeterogeneousCnnEnsemble(model_paths, model_types)
+        model = CnnMelCqtEnsemble(model_paths, model_types)
     elif use_mel_model:
         model_path = os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME)
         model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))

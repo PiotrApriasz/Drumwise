@@ -5,5 +5,5 @@ namespace Drumwise.Features.Homeworks;
 public static class HomeworkErrors
 {
     public static IEnumerable<Error> HomeworkNotFound =>
-        Error.ApplicationError(new[] { ErrorCodes.Homework.HomeworkNotFound });
+        Error.ApplicationError([ErrorCodes.Homework.HomeworkNotFound]);
 }

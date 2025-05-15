@@ -89,8 +89,12 @@ def get_model_paths(model_type: str, feature_type: str):
     return best_path
 
 
-def evaluate_on_test_set(model_type, feature_type, criterion=None):
-    print(f"Evaluating {model_type.upper()} model with {feature_type.upper()} features on test set...")
+def perform_test_set_evaluation(model_type, feature_type, criterion=None):
+    """
+    Loads the classifier and evaluates the model on its test set.
+    Returns the raw evaluation results from classifier.evaluate_model().
+    """
+    print(f"Performing test set evaluation for {model_type.upper()} with {feature_type.upper()} features...")
 
     try:
         model_path = get_model_paths(model_type, feature_type)
@@ -98,26 +102,23 @@ def evaluate_on_test_set(model_type, feature_type, criterion=None):
             raise FileNotFoundError(f"Model file not found at: {model_path}")
 
         ClassifierClass = get_classifier_class(model_type)
+        # Assuming classifier can be instantiated with feature_type and loads its own data for evaluation
         classifier = ClassifierClass(feature_type=feature_type)
 
         if criterion is None:
-            criterion = torch.nn.CrossEntropyLoss()
+            criterion = torch.nn.CrossEntropyLoss()  # Default criterion
 
-        results = classifier.evaluate_model(model_path=model_path, criterion=criterion)
+        # This call is expected to return a dict including:
+        # 'test_loss', 'test_acc', 'confusion_matrix', 'labels', 'predictions', 'outputs'
+        base_eval_results = classifier.evaluate_model(model_path=model_path, criterion=criterion)
 
-        print("\nTest Set Evaluation Results:")
-        print(f"Test Accuracy: {results['test_acc']:.4f}")
-        print(f"Test Loss: {results['test_loss']:.4f}")
+        print("\nBase Evaluation (from classifier.evaluate_model) Complete:")
+        if 'test_acc' in base_eval_results:
+            print(f"  Test Accuracy: {base_eval_results['test_acc']:.4f}")
+        if 'test_loss' in base_eval_results:
+            print(f"  Test Loss: {base_eval_results['test_loss']:.4f}")
 
-        print("\nPer-class metrics:")
-        cm = results['confusion_matrix']
-        for i, instrument in enumerate(DRUM_INSTRUMENTS):
-            class_correct = cm[i, i]
-            class_total = cm[i, :].sum()
-            accuracy = class_correct / class_total if class_total > 0 else 0
-            print(f"{instrument}: Accuracy={accuracy:.4f} ({class_correct}/{class_total})")
-
-        return results
+        return base_eval_results
 
     except Exception as e:
         print(f"Error during test set evaluation: {e}")
@@ -130,8 +131,8 @@ def evaluate_on_audio_files(model_type, feature_type, use_ensemble=False):
     print(f"Evaluating {model_type.upper()} model with {feature_type.upper()} features on audio files...")
 
     try:
-        if use_ensemble and model_type.lower() == 'heterogeneous':
-            from src.models.dl_classifiers.classifiers.heterogeneous_cnn_classifier import HeterogeneousCnnEnsemble
+        if use_ensemble and model_type.lower() == 'cnn_mel_cqt_ensemble':
+            from src.models.dl_classifiers.classifiers.cnn_mel_cqt_ensemble_classifier import CnnMelCqtEnsemble
             from src.constants import MEL_BEST_CNN_MODEL_NAME, CQT_BEST_CNN_MODEL_NAME
 
             model_paths = [
@@ -139,7 +140,7 @@ def evaluate_on_audio_files(model_type, feature_type, use_ensemble=False):
                 os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
             ]
             model_types = ['mel', 'cqt']
-            model = HeterogeneousCnnEnsemble(model_paths, model_types)
+            model = CnnMelCqtEnsemble(model_paths, model_types)
         else:
             model_path = get_model_paths(model_type, feature_type)
             if not os.path.exists(model_path):
@@ -245,6 +246,21 @@ def visualize_confusion_matrix(confusion_matrix, labels=None, title=None, save_p
         plt.show()
 
 
+def convert_numpy_types(obj):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    else:
+        return obj
+
+
 def save_evaluation_results(results, model_type, feature_type, eval_type):
     import json
     from datetime import datetime
@@ -254,20 +270,6 @@ def save_evaluation_results(results, model_type, feature_type, eval_type):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_filename = f"{model_type}_{feature_type}_{eval_type}_eval_{timestamp}"
-
-    def convert_numpy_types(obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, list):
-            return [convert_numpy_types(item) for item in obj]
-        elif isinstance(obj, dict):
-            return {key: convert_numpy_types(value) for key, value in obj.items()}
-        else:
-            return obj
 
     results_to_save = convert_numpy_types({k: v for k, v in results.items() if k != 'confusion_matrix'})
 
@@ -305,9 +307,9 @@ def run_evaluation(args):
     print("-------------------------------------")
 
     use_ensemble = False
-    if model_type == 'heterogeneous':
+    if model_type == 'cnn_mel_cqt_ensemble':
         use_ensemble = True
-        print("Using heterogeneous ensemble of models...")
+        print("Using cnn_mel_cqt_ensemble models...")
 
     if args.test_set:
         criterion = torch.nn.CrossEntropyLoss()
@@ -328,7 +330,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate trained deep learning models on test set or audio files.")
 
     parser.add_argument('--model-type', type=str, required=True,
-                        choices=['cnn', 'lstm', 'transformer', 'cnn_lstm', 'heterogeneous'],
+                        choices=['cnn', 'lstm', 'transformer', 'cnn_lstm', 'cnn_mel_cqt_ensemble'],
                         help="Type of model to evaluate.")
     parser.add_argument('--feature-type', type=str, required=True,
                         choices=['cqt', 'mel'],
