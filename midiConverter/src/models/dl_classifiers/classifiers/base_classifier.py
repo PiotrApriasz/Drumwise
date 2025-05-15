@@ -266,7 +266,6 @@ class BaseClassifier(nn.Module, ABC):
         return {
             "test_loss": test_loss,
             "test_acc": test_acc,
-            "confusion_matrix": cm,
             "labels": all_labels,
             "predictions": all_preds,
             "outputs": all_outputs
