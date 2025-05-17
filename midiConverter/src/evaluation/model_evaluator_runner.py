@@ -126,7 +126,7 @@ def perform_test_set_evaluation(model_type, feature_type, criterion=None):
         detailed_metrics = get_all_single_label_metrics(
             y_true=true_labels,
             y_pred_classes=pred_classes,
-            y_pred_proba=pred_proba,
+            y_pred_logits=pred_proba,
             class_names=list(DRUM_INSTRUMENTS),
             num_classes=len(DRUM_INSTRUMENTS)
         )
@@ -310,9 +310,29 @@ def evaluate_on_audio_files(model_type, feature_type):
             print("No valid audio files processed. Skipping audio file metrics calculation.")
             return None
 
+        unique_true_labels = set(y_true_audio)
+        unique_pred_labels = set(y_pred_audio)
+        instrument_to_idx = {instrument: idx for idx, instrument in enumerate(DRUM_INSTRUMENTS)}
+
+        # Convert string labels to numeric indices if needed
+        if isinstance(y_true_audio[0], str):
+            y_true_indices = [instrument_to_idx.get(label, -1) for label in y_true_audio]
+            y_pred_indices = [instrument_to_idx.get(label, -1) for label in y_pred_audio]
+
+            # Filter out any invalid labels (-1)
+            valid_entries = [(true_idx, pred_idx) for true_idx, pred_idx in zip(y_true_indices, y_pred_indices) if true_idx != -1]
+            if not valid_entries:
+                print("No valid label pairs after conversion. Cannot calculate metrics.")
+                return None
+
+            y_true_filtered, y_pred_filtered = zip(*valid_entries)
+        else:
+            y_true_filtered = y_true_audio
+            y_pred_filtered = y_pred_audio
+
         audio_eval_results = get_all_single_label_metrics(
-            y_true=y_true_audio,
-            y_pred_classes=y_pred_audio,
+            y_true=y_true_filtered,
+            y_pred_classes=y_pred_filtered,
             class_names=list(DRUM_INSTRUMENTS),
             num_classes=len(DRUM_INSTRUMENTS)
         )
@@ -463,24 +483,23 @@ def run_all_evaluations(args):
     current_model_type = args.model_type.lower()
     ensemble_model_name = 'cnn_mel_cqt_ensemble'
 
-    if args.test_set:
-        print(f"\n--- Preparing for Test Set Evaluation ---")
-        test_results = None
-        if current_model_type == ensemble_model_name:
-            print(f"Recognized ensemble model type: {current_model_type}. Running ensemble test set evaluation.")
-            test_results = perform_ensemble_test_set_evaluation(criterion=criterion)
-        else:
-            print(f"Recognized single model type: {current_model_type}. Running standard test set evaluation.")
-            effective_feature_type = args.feature_type.lower() if args.feature_type else None
-            if not effective_feature_type and current_model_type != ensemble_model_name:
-                print(
-                    f"Warning: feature_type not specified for single model {current_model_type}. This might be an issue for perform_test_set_evaluation.")
+    print(f"\n--- Preparing for Test Set Evaluation ---")
+    test_results = None
+    if current_model_type == ensemble_model_name:
+        print(f"Recognized ensemble model type: {current_model_type}. Running ensemble test set evaluation.")
+        test_results = perform_ensemble_test_set_evaluation(criterion=criterion)
+    else:
+        print(f"Recognized single model type: {current_model_type}. Running standard test set evaluation.")
+        effective_feature_type = args.feature_type.lower() if args.feature_type else None
+        if not effective_feature_type and current_model_type != ensemble_model_name:
+            print(
+                f"Warning: feature_type not specified for single model {current_model_type}. This might be an issue for perform_test_set_evaluation.")
 
-            test_results = perform_test_set_evaluation(
-                model_type=current_model_type,
-                feature_type=effective_feature_type,
-                criterion=criterion
-            )
+        test_results = perform_test_set_evaluation(
+            model_type=current_model_type,
+            feature_type=effective_feature_type,
+            criterion=criterion
+        )
 
         if test_results:
             all_results['test_set_evaluation'] = test_results
@@ -489,7 +508,6 @@ def run_all_evaluations(args):
         else:
             print(f"Test Set Evaluation FAILED or returned no results for {current_model_type}.")
 
-    if args.audio_files:
         print(f"\n--- Preparing for Audio Files Evaluation ---")
         audio_eval_results = None
         if current_model_type == ensemble_model_name:
@@ -511,6 +529,7 @@ def run_all_evaluations(args):
             print(f"Audio Files Evaluation completed for {current_model_type}.")
         else:
             print(f"Audio Files Evaluation FAILED or returned no results for {current_model_type}.")
+
 
     if all_results and args.save_results:
         print(f"\n--- Saving Combined Results for {current_model_type} ---")

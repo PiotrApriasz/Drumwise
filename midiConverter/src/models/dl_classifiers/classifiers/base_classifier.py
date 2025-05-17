@@ -245,7 +245,7 @@ class BaseClassifier(nn.Module, ABC):
         self.model.load_state_dict(torch.load(model_path))
         self.model.eval()
 
-        _, _, test_dataset = self._create_datasets(augment_factor=0)
+        _, _, test_dataset = self._create_datasets(augment_factor=2)
         _, _, test_loader = self._create_dataloaders(None, None, test_dataset)
 
         test_loss, test_acc, all_labels, all_preds, all_outputs = self._evaluate(test_loader, criterion)
