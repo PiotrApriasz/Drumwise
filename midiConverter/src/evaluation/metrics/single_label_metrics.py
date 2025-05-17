@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix, classification_report, \
-    roc_auc_score
+    roc_auc_score, precision_recall_curve, roc_curve, auc
 
 
 def calculate_basic_metrics(y_true, y_pred_classes):
@@ -183,48 +183,177 @@ def calculate_roc_auc_scores(y_true, y_pred_logits, num_classes=None, class_name
     return roc_auc_metrics
 
 
-# Example of how you might combine these:
-def get_all_single_label_metrics(y_true, y_pred_classes, y_pred_proba=None, class_names=None, num_classes=None):
+def get_roc_curve_data(y_true, y_pred_logits, num_classes, class_names=None):
+    """
+    Computes ROC curve data (FPR, TPR, thresholds) for each class.
+    Args:
+        y_true: True labels (1D array).
+        y_pred_logits: Raw logit outputs from the model (2D array: n_samples, n_classes).
+        num_classes: Total number of classes.
+        class_names: List of class names for dictionary keys. If None, uses "class_i".
+    Returns:
+        A dictionary where keys are class names (or "class_i") and values are
+        tuples of (fpr, tpr, thresholds, roc_auc_for_class).
+    """
+    y_true = np.asarray(y_true).ravel()
+    y_pred_proba = _softmax_numpy(np.asarray(y_pred_logits), axis=1)
+
+    roc_curve_data = {}
+
+    if class_names is None:
+        class_names = [f"class_{i}" for i in range(num_classes)]
+    elif len(class_names) != num_classes:
+        print("Warning: Length of class_names does not match num_classes. Using generic names.")
+        class_names = [f"class_{i}" for i in range(num_classes)]
+
+    safe_class_names = [str(name).replace(' ', '_').replace('/', '_') for name in class_names]
+
+    for i in range(num_classes):
+        y_true_class = (y_true == i).astype(int)
+        y_pred_proba_class = y_pred_proba[:, i]
+
+        if np.sum(y_true_class) == 0 or np.sum(y_true_class) == len(y_true_class):
+            fpr, tpr, thresholds = np.array([]), np.array([]), np.array([])
+            roc_auc_for_class = np.nan
+            print(
+                f"Warning: ROC curve for class '{safe_class_names[i]}' may be ill-defined due to no positive samples or only positive samples.")
+        else:
+            fpr, tpr, thresholds = roc_curve(y_true_class, y_pred_proba_class)
+            roc_auc_for_class = auc(fpr, tpr)
+
+        roc_curve_data[f"roc_curve_{safe_class_names[i]}"] = {
+            "fpr": fpr.tolist(),
+            "tpr": tpr.tolist(),
+            "thresholds": thresholds.tolist(),
+            "auc": roc_auc_for_class
+        }
+    return roc_curve_data
+
+
+def get_precision_recall_curve_data(y_true, y_pred_logits, num_classes, class_names=None):
+    """
+    Computes Precision-Recall curve data for each class.
+    Args:
+        y_true: True labels (1D array).
+        y_pred_logits: Raw logit outputs from the model (2D array: n_samples, n_classes).
+        num_classes: Total number of classes.
+        class_names: List of class names for dictionary keys. If None, uses "class_i".
+    Returns:
+        A dictionary where keys are class names (or "class_i") and values are
+        tuples of (precision, recall, thresholds, average_precision_for_class).
+    """
+    y_true = np.asarray(y_true).ravel()
+    y_pred_proba = _softmax_numpy(np.asarray(y_pred_logits), axis=1)
+
+    pr_curve_data = {}
+
+    if class_names is None:
+        class_names = [f"class_{i}" for i in range(num_classes)]
+    elif len(class_names) != num_classes:
+        print("Warning: Length of class_names does not match num_classes. Using generic names.")
+        class_names = [f"class_{i}" for i in range(num_classes)]
+
+    safe_class_names = [str(name).replace(' ', '_').replace('/', '_') for name in class_names]
+
+    for i in range(num_classes):
+        y_true_class = (y_true == i).astype(int)
+        y_pred_proba_class = y_pred_proba[:, i]
+
+        if np.sum(y_true_class) == 0:
+            precision, recall, thresholds = np.array([0]), np.array([0]), np.array([])
+            average_precision_for_class = 0.0
+            print(f"Warning: Precision-Recall curve for class '{safe_class_names[i]}' may be ill-defined due to no positive samples.")
+        else:
+            precision, recall, thresholds = precision_recall_curve(y_true_class, y_pred_proba_class)
+            from sklearn.metrics import average_precision_score
+            average_precision_for_class = average_precision_score(y_true_class, y_pred_proba_class)
+
+        pr_curve_data[f"pr_curve_{safe_class_names[i]}"] = {
+            "precision": precision.tolist(),
+            "recall": recall.tolist(),
+            "thresholds": thresholds.tolist(),
+            "average_precision": average_precision_for_class
+        }
+    return pr_curve_data
+
+
+def get_all_single_label_metrics(y_true, y_pred_classes, y_pred_logits=None, class_names=None, num_classes=None,
+                                 calculate_curve_data=False):  # Added y_pred_logits and calculate_curve_data
     """
     Calculates and combines all relevant single-label metrics.
     Args:
         y_true: True labels (list or np.array).
         y_pred_classes: Predicted classes (argmax of model output).
-        y_pred_proba: Raw probability outputs from the model (optional, for future ROC/AUC).
+        y_pred_logits: Raw logit outputs from the model (optional, for ROC/AUC and curve data).
         class_names: List of class names for reporting.
-        num_classes: Total number of classes for consistent confusion matrix size.
+        num_classes: Total number of classes.
+        calculate_curve_data: If True, computes ROC and PR curve points.
     Returns:
         A comprehensive dictionary of all calculated metrics.
     """
     metrics = {}
+    y_true_arr = np.asarray(y_true)
+    y_pred_classes_arr = np.asarray(y_pred_classes)
 
-    basic_metrics = calculate_basic_metrics(y_true, y_pred_classes)
+    basic_metrics = calculate_basic_metrics(y_true_arr, y_pred_classes_arr)
     metrics.update(basic_metrics)
 
-    per_class_report = calculate_per_class_metrics(y_true, y_pred_classes, class_names=class_names)
-    metrics.update(per_class_report)  # This nests the report dict under "classification_report"
+    per_class_report = calculate_per_class_metrics(y_true_arr, y_pred_classes_arr, class_names=class_names)
+    metrics.update(per_class_report)
 
-    conf_matrix = generate_confusion_matrix(y_true, y_pred_classes, num_classes=num_classes)
-    metrics["confusion_matrix_calculated_here"] = conf_matrix
+    inferred_num_classes = num_classes
+    if inferred_num_classes is None:
+        if y_pred_logits is not None and hasattr(y_pred_logits, 'shape') and len(y_pred_logits.shape) == 2:
+            inferred_num_classes = y_pred_logits.shape[1]
+        else:
+            unique_labels = np.unique(np.concatenate((y_true_arr, y_pred_classes_arr)))
+            if len(unique_labels) > 0:
+                inferred_num_classes = int(np.max(unique_labels)) + 1
 
-    if y_pred_proba is not None:
-        inferred_num_classes_for_roc = num_classes
-        if inferred_num_classes_for_roc is None and hasattr(y_pred_proba, 'shape') and len(y_pred_proba.shape) == 2:
-            inferred_num_classes_for_roc = y_pred_proba.shape[1]
+    conf_matrix = generate_confusion_matrix(y_true_arr, y_pred_classes_arr, num_classes=inferred_num_classes)
+    metrics["confusion_matrix"] = conf_matrix.tolist()  # Changed key and converted to list for JSON
 
-        roc_class_names = class_names
-        if class_names and inferred_num_classes_for_roc and len(class_names) != inferred_num_classes_for_roc:
-            print(
-                f"Warning: Length of class_names ({len(class_names)}) for ROC AUC does not match inferred num_classes ({inferred_num_classes_for_roc}). Per-class ROC AUC by name might be affected.")
-            roc_class_names = None
+    if y_pred_logits is not None:
+        y_pred_logits_arr = np.asarray(y_pred_logits)
 
-        roc_auc_results = calculate_roc_auc_scores(
-            y_true,
-            y_pred_logits=y_pred_proba,
-            num_classes=inferred_num_classes_for_roc,
-            class_names=roc_class_names
-        )
-        metrics.update(roc_auc_results)
+        current_num_classes_for_roc_pr = inferred_num_classes
+        if current_num_classes_for_roc_pr is None:  # Should ideally be set by now
+            if hasattr(y_pred_logits_arr, 'shape') and len(y_pred_logits_arr.shape) == 2:
+                current_num_classes_for_roc_pr = y_pred_logits_arr.shape[1]
+
+        if current_num_classes_for_roc_pr is not None:
+            roc_class_names = class_names
+            if class_names and len(class_names) != current_num_classes_for_roc_pr:
+                print(
+                    f"Warning: Length of class_names ({len(class_names)}) does not match inferred num_classes ({current_num_classes_for_roc_pr}) for ROC/PR. Per-class naming might be affected.")
+
+            roc_auc_results = calculate_roc_auc_scores(
+                y_true_arr,
+                y_pred_logits_arr,
+                num_classes=current_num_classes_for_roc_pr,
+                class_names=roc_class_names
+            )
+            metrics.update(roc_auc_results)
+
+            if calculate_curve_data:
+                roc_curves = get_roc_curve_data(
+                    y_true_arr,
+                    y_pred_logits_arr,
+                    num_classes=current_num_classes_for_roc_pr,
+                    class_names=roc_class_names
+                )
+                metrics["roc_curve_data"] = roc_curves
+
+                pr_curves = get_precision_recall_curve_data(
+                    y_true_arr,
+                    y_pred_logits_arr,
+                    num_classes=current_num_classes_for_roc_pr,
+                    class_names=roc_class_names
+                )
+                metrics["pr_curve_data"] = pr_curves
+        else:
+            print("Warning: num_classes could not be inferred for ROC/PR calculations. Skipping.")
 
     return metrics
+
 

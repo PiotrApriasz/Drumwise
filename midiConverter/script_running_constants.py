@@ -1,2 +1,20 @@
+# Training commands
 RUN_CNN_CQT_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type cnn --feature-type cqt"
 RUN_CNN_MEL_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type cnn --feature-type mel"
+RUN_LSTM_CQT_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type lstm --feature-type cqt"
+RUN_LSTM_MEL_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type lstm --feature-type mel"
+RUN_TRANSFORMER_CQT_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type transformer --feature-type cqt"
+RUN_TRANSFORMER_MEL_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type transformer --feature-type mel"
+RUN_CNN_LSTM_CQT_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type cnn_lstm --feature-type cqt"
+RUN_CNN_LSTM_MEL_DEFAULT = "python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type cnn_lstm --feature-type mel"
+
+# Evaluation commands
+EVAL_CNN_CQT_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type cnn --feature-type cqt --save-results"
+EVAL_CNN_MEL_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type cnn --feature-type mel --save-results"
+EVAL_LSTM_CQT_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type lstm --feature-type cqt --save-results"
+EVAL_LSTM_MEL_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type lstm --feature-type mel --save-results"
+EVAL_TRANSFORMER_CQT_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type transformer --feature-type cqt --save-results"
+EVAL_TRANSFORMER_MEL_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type transformer --feature-type mel --save-results"
+EVAL_CNN_LSTM_CQT_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type cnn_lstm --feature-type cqt --save-results"
+EVAL_CNN_LSTM_MEL_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type cnn_lstm --feature-type mel --save-results"
+EVAL_ENSEMBLE_DEFAULT = "python -m src.evaluation.model_evaluator_runner --model-type cnn_mel_cqt_ens --feature-type ensemble_meta --save-results"

@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import json
 
 import torch
@@ -372,26 +372,74 @@ def convert_numpy_types(obj):
 def save_combined_results(overall_results_dict, model_type, feature_type):
     os.makedirs(EVALUATION_RESULTS_PATH, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_filename = f"{model_type}_{feature_type}_all_evals_{timestamp}"
 
+    # Create a dedicated directory for this evaluation run
+    experiment_name = f"{model_type}_{feature_type}_{timestamp}"
+    results_dir = os.path.join(EVALUATION_RESULTS_PATH, experiment_name)
+    os.makedirs(results_dir, exist_ok=True)
+
+    base_filename = f"{model_type}_{feature_type}_all_evals"
+
+    # Extract and save raw prediction data
+    raw_predictions_info = {}
+
+    # Process test set evaluation data
+    if 'test_set_evaluation' in overall_results_dict and overall_results_dict['test_set_evaluation']:
+        test_eval = overall_results_dict['test_set_evaluation']
+
+        # Extract raw prediction data if available
+        y_true = test_eval.get('labels')
+        y_pred_classes = test_eval.get('predictions')
+        y_pred_logits = test_eval.get('outputs')
+
+        if y_true is not None and y_pred_classes is not None:
+            # Create paths for raw prediction files
+            y_true_path = os.path.join(results_dir, f"{base_filename}_y_true.npy")
+            y_pred_classes_path = os.path.join(results_dir, f"{base_filename}_y_pred_classes.npy")
+
+            # Save NumPy arrays
+            np.save(y_true_path, np.array(y_true))
+            np.save(y_pred_classes_path, np.array(y_pred_classes))
+
+            # Store relative paths in info dictionary
+            raw_predictions_info['test_set'] = {
+                'y_true': os.path.basename(y_true_path),
+                'y_pred_classes': os.path.basename(y_pred_classes_path),
+            }
+
+            if y_pred_logits is not None:
+                y_pred_logits_path = os.path.join(results_dir, f"{base_filename}_y_pred_logits.npy")
+                np.save(y_pred_logits_path, np.array(y_pred_logits))
+                raw_predictions_info['test_set']['y_pred_logits'] = os.path.basename(y_pred_logits_path)
+
+    # Add raw predictions info to results
     savable_results = convert_numpy_types(overall_results_dict)
+    savable_results['raw_predictions_paths'] = raw_predictions_info
+    savable_results['experiment_name'] = experiment_name
 
-    json_path = os.path.join(EVALUATION_RESULTS_PATH, f"{base_filename}.json")
+    # Save JSON results file
+    json_path = os.path.join(results_dir, f"{base_filename}.json")
     with open(json_path, 'w') as f:
         json.dump(savable_results, f, indent=2)
     print(f"Combined evaluation results saved to: {json_path}")
 
+    # Also save a copy in the main directory for backward compatibility
+    main_json_path = os.path.join(EVALUATION_RESULTS_PATH, f"{experiment_name}.json")
+    with open(main_json_path, 'w') as f:
+        json.dump(savable_results, f, indent=2)
+    print(f"Reference copy saved to: {main_json_path}")
+
+    # Save confusion matrix visualizations
     if 'test_set_evaluation' in savable_results and savable_results['test_set_evaluation']:
         test_cm = savable_results['test_set_evaluation'].get('confusion_matrix')
         if test_cm is not None:
-            cm_path_test = os.path.join(EVALUATION_RESULTS_PATH, f"{base_filename}_test_set_cm.png")
+            cm_path_test = os.path.join(results_dir, f"{base_filename}_test_set_cm.png")
             visualize_confusion_matrix(test_cm, title=f"{model_type.upper()} Test Set CM", save_path=cm_path_test)
         elif 'classification_report' in savable_results['test_set_evaluation'] and \
              'confusion_matrix_calculated_here' in savable_results['test_set_evaluation']['classification_report']:
             test_cm_alt = savable_results['test_set_evaluation']['classification_report']['confusion_matrix_calculated_here']
-            cm_path_test_alt = os.path.join(EVALUATION_RESULTS_PATH, f"{base_filename}_test_set_detailed_cm.png")
+            cm_path_test_alt = os.path.join(results_dir, f"{base_filename}_test_set_detailed_cm.png")
             visualize_confusion_matrix(test_cm_alt, title=f"{model_type.upper()} Test Set Detailed CM", save_path=cm_path_test_alt)
-
 
     if 'audio_files_evaluation' in savable_results and savable_results['audio_files_evaluation']:
         audio_cm = savable_results['audio_files_evaluation'].get('confusion_matrix')
@@ -399,8 +447,11 @@ def save_combined_results(overall_results_dict, model_type, feature_type):
              audio_cm = savable_results['audio_files_evaluation']['classification_report'].get('confusion_matrix_calculated_here')
 
         if audio_cm is not None:
-            cm_path_audio = os.path.join(EVALUATION_RESULTS_PATH, f"{base_filename}_audio_files_cm.png")
+            cm_path_audio = os.path.join(results_dir, f"{base_filename}_audio_files_cm.png")
             visualize_confusion_matrix(audio_cm, title=f"{model_type.upper()} Audio Files CM", save_path=cm_path_audio)
+
+    print(f"All evaluation data saved to directory: {results_dir}")
+    return json_path, results_dir
 
 
 def run_all_evaluations(args):
@@ -466,11 +517,12 @@ def run_all_evaluations(args):
         save_feature_type_tag = "ensemble" if current_model_type == ensemble_model_name else (
             args.feature_type.lower() if args.feature_type else "unknown_feature")
 
-        save_combined_results(
+        json_path, results_dir = save_combined_results(
             overall_results_dict=all_results,
             model_type=current_model_type,
             feature_type=save_feature_type_tag
         )
+        print(f"Results saved to: {results_dir}")
     elif not all_results:
         print("\nNo results generated to save.")
 
