@@ -18,6 +18,8 @@ from src.data.dataset.single_label_dataset_loader import load_dataset_with_split
 from src.evaluation.metrics.single_label_metrics import get_all_single_label_metrics
 from src.models.dl_classifiers.classifiers.cnn_mel_cqt_ensemble_classifier import CnnMelCqtEnsemble
 
+ENSEMBLE_MODEL_TYPE = 'cnn_mel_cqt_ens'
+
 
 def get_classifier_class(model_type: str):
     model_type = model_type.lower()
@@ -247,11 +249,12 @@ def perform_ensemble_test_set_evaluation(criterion):
 
 
 def evaluate_on_audio_files(model_type, feature_type):
-    print(f"Evaluating {model_type.upper()} model with {feature_type.upper()} features on audio files...")
+    feature_label = feature_type.upper() if feature_type else "ENSEMBLE (MEL+CQT)"
+    print(f"Evaluating {model_type.upper()} model with {feature_label} features on audio files...")
 
     use_ensemble = False
     try:
-        if model_type.lower() == 'cnn_mel_cqt_ensemble':
+        if model_type.lower() == ENSEMBLE_MODEL_TYPE:
             use_ensemble = True
 
             model_paths_ensemble = [
@@ -481,17 +484,16 @@ def run_all_evaluations(args):
     criterion = torch.nn.CrossEntropyLoss()
 
     current_model_type = args.model_type.lower()
-    ensemble_model_name = 'cnn_mel_cqt_ensemble'
 
     print(f"\n--- Preparing for Test Set Evaluation ---")
     test_results = None
-    if current_model_type == ensemble_model_name:
+    if current_model_type == ENSEMBLE_MODEL_TYPE:
         print(f"Recognized ensemble model type: {current_model_type}. Running ensemble test set evaluation.")
         test_results = perform_ensemble_test_set_evaluation(criterion=criterion)
     else:
         print(f"Recognized single model type: {current_model_type}. Running standard test set evaluation.")
         effective_feature_type = args.feature_type.lower() if args.feature_type else None
-        if not effective_feature_type and current_model_type != ensemble_model_name:
+        if not effective_feature_type:
             print(
                 f"Warning: feature_type not specified for single model {current_model_type}. This might be an issue for perform_test_set_evaluation.")
 
@@ -501,39 +503,39 @@ def run_all_evaluations(args):
             criterion=criterion
         )
 
-        if test_results:
-            all_results['test_set_evaluation'] = test_results
-            print(f"Test Set Evaluation completed for {current_model_type}.")
-            if 'test_acc' in test_results: print(f"  Accuracy: {test_results['test_acc']:.4f}")
-        else:
-            print(f"Test Set Evaluation FAILED or returned no results for {current_model_type}.")
+    if test_results:
+        all_results['test_set_evaluation'] = test_results
+        print(f"Test Set Evaluation completed for {current_model_type}.")
+        if 'test_acc' in test_results: print(f"  Accuracy: {test_results['test_acc']:.4f}")
+    else:
+        print(f"Test Set Evaluation FAILED or returned no results for {current_model_type}.")
 
-        print(f"\n--- Preparing for Audio Files Evaluation ---")
-        audio_eval_results = None
-        if current_model_type == ensemble_model_name:
-            print(f"Recognized ensemble model type: {current_model_type}. Running ensemble audio files evaluation.")
-            audio_eval_results = evaluate_on_audio_files(
-                model_type=current_model_type,
-                feature_type=None
-            )
-        else:
-            print(f"Recognized single model type: {current_model_type}. Running standard audio files evaluation.")
-            effective_feature_type = args.feature_type.lower() if args.feature_type else None
-            audio_eval_results = evaluate_on_audio_files(
-                model_type=current_model_type,
-                feature_type=effective_feature_type
-            )
+    print(f"\n--- Preparing for Audio Files Evaluation ---")
+    audio_eval_results = None
+    if current_model_type == ENSEMBLE_MODEL_TYPE:
+        print(f"Recognized ensemble model type: {current_model_type}. Running ensemble audio files evaluation.")
+        audio_eval_results = evaluate_on_audio_files(
+            model_type=current_model_type,
+            feature_type=None
+        )
+    else:
+        print(f"Recognized single model type: {current_model_type}. Running standard audio files evaluation.")
+        effective_feature_type = args.feature_type.lower() if args.feature_type else None
+        audio_eval_results = evaluate_on_audio_files(
+            model_type=current_model_type,
+            feature_type=effective_feature_type
+        )
 
-        if audio_eval_results:
-            all_results['audio_files_evaluation'] = audio_eval_results
-            print(f"Audio Files Evaluation completed for {current_model_type}.")
-        else:
-            print(f"Audio Files Evaluation FAILED or returned no results for {current_model_type}.")
+    if audio_eval_results:
+        all_results['audio_files_evaluation'] = audio_eval_results
+        print(f"Audio Files Evaluation completed for {current_model_type}.")
+    else:
+        print(f"Audio Files Evaluation FAILED or returned no results for {current_model_type}.")
 
 
     if all_results and args.save_results:
         print(f"\n--- Saving Combined Results for {current_model_type} ---")
-        save_feature_type_tag = "ensemble" if current_model_type == ensemble_model_name else (
+        save_feature_type_tag = "ensemble" if current_model_type == ENSEMBLE_MODEL_TYPE else (
             args.feature_type.lower() if args.feature_type else "unknown_feature")
 
         json_path, results_dir = save_combined_results(
@@ -554,7 +556,7 @@ if __name__ == "__main__":
         description="Run comprehensive evaluations (Test Set and Audio Files) for DL models.")
 
     parser.add_argument('--model-type', type=str, required=True,
-                        choices=['cnn', 'lstm', 'transformer', 'cnn_lstm', 'cnn_mel_cqt_ens'],
+                        choices=['cnn', 'lstm', 'transformer', 'cnn_lstm', ENSEMBLE_MODEL_TYPE],
                         help="Type of model to evaluate.")
 
     parser.add_argument('--feature-type', type=str, required=True,
@@ -566,7 +568,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     effective_feature_type = args.feature_type
-    if args.model_type.lower() == 'cnn_mel_cqt_ens' and args.feature_type == 'ensemble_meta':
+    if args.model_type.lower() == ENSEMBLE_MODEL_TYPE and args.feature_type == 'ensemble_meta':
         effective_feature_type = 'ensemble'
 
     run_all_evaluations(args)
