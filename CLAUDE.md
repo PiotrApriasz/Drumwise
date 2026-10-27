@@ -35,7 +35,9 @@ python -m src.baseline.evaluation.model_evaluator_runner --model-type cnn --feat
 python -m src.baseline.models.tuners.tunning_runner --model-type cnn --feature-type cqt --n-trials 50 [--storage sqlite:///tuning.db]
 ```
 
-The canonical command strings live in `script_running_constants.py`. pytest and flake8 are installed, but there is no test suite.
+The canonical command strings live in `script_running_constants.py`. Run `python -m src.data.check_leakage` before any training: it fails if the same audio is in two splits or in a split and `CUTTED_VAL_SETS_PATH`. `pytest` (from `midiConverter/`) runs the smoke tests in `tests/`.
+
+Splits in `TRAINING_PATH` are by source recording, not by file (see `src/baseline/data/tools/resplit_training_data.py`). The own-kit recordings are test-only and must not be copied into `training/`.
 
 ### Implementation status
 
