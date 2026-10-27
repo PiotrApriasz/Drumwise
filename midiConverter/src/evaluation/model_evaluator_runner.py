@@ -11,14 +11,9 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report, precision_recall_fscore_support
 from pathlib import Path
 
-from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, EVALUATION_RESULTS_PATH, \
-    MEL_BEST_CNN_MODEL_NAME, CQT_BEST_CNN_MODEL_NAME
+from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, EVALUATION_RESULTS_PATH
 from src.converters.conversion_utils import extract_true_label, classify_instrument_dl
-from src.data.dataset.single_label_dataset_loader import load_dataset_with_splits
 from src.evaluation.metrics.single_label_metrics import get_all_single_label_metrics
-from src.models.dl_classifiers.classifiers.cnn_mel_cqt_ensemble_classifier import CnnMelCqtEnsemble
-
-ENSEMBLE_MODEL_TYPE = 'cnn_mel_cqt_ens'
 
 
 def get_classifier_class(model_type: str):
@@ -27,15 +22,6 @@ def get_classifier_class(model_type: str):
     if model_type == 'cnn':
         module_path = 'src.models.dl_classifiers.classifiers.cnn_classifier'
         class_name = 'DrumCNNClassifier'
-    elif model_type == 'lstm':
-        module_path = 'src.models.dl_classifiers.classifiers.lstm_classifier'
-        class_name = 'DrumLSTMClassifier'
-    elif model_type == 'transformer':
-        module_path = 'src.models.dl_classifiers.classifiers.transformer_classifier'
-        class_name = 'DrumTransformerClassifier'
-    elif model_type == 'cnn_lstm':
-        module_path = 'src.models.dl_classifiers.classifiers.cnn_lstm_classifier'
-        class_name = 'DrumCnnLstmClassifier'
     else:
         raise ValueError(f"Unknown model type: {model_type}.")
 
@@ -57,15 +43,6 @@ def get_model_implementation_class(model_type: str):
     if model_type == 'cnn':
         module_path = 'src.models.dl_classifiers.classifiers.cnn_classifier'
         class_name = 'DrumCNN'
-    elif model_type == 'lstm':
-        module_path = 'src.models.dl_classifiers.classifiers.lstm_classifier'
-        class_name = 'DrumLSTM'
-    elif model_type == 'transformer':
-        module_path = 'src.models.dl_classifiers.classifiers.transformer_classifier'
-        class_name = 'DrumTransformer'
-    elif model_type == 'cnn_lstm':
-        module_path = 'src.models.dl_classifiers.classifiers.cnn_lstm_classifier'
-        class_name = 'DrumCnnLstm'
     else:
         raise ValueError(f"Unknown model type: {model_type}.")
 
@@ -144,141 +121,19 @@ def perform_test_set_evaluation(model_type, feature_type, criterion=None):
         return None
 
 
-def perform_ensemble_test_set_evaluation(criterion):
-    """
-    Performs test set evaluation for the CnnEnsemble.
-    This function is designed to be called from run_all_evaluations.
-    Args:
-        criterion: The loss function to use for evaluation.
-    Returns:
-        A dictionary containing evaluation results, or None on error.
-    """
-    print(f"\n--- Starting Test Set Evaluation for CNN ENSEMBLE ---")
-    model_type_display = "_CNN_ENSEMBLE"
-
-    try:
-        print("Loading raw test audio data for ensemble...")
-
-        dataset_splits = load_dataset_with_splits()
-
-        if isinstance(dataset_splits, tuple) and len(dataset_splits) == 3:
-            _, _, test_data_raw = dataset_splits
-        elif isinstance(dataset_splits, dict) and 'test' in dataset_splits:
-            test_data_raw = dataset_splits['test']
-        else:
-            raise ValueError(
-                f"Unsupported format from load_dataset_with_splits for raw audio. Expected tuple of 3 or dict with 'test' key. Got: {type(dataset_splits)}")
-
-        if not test_data_raw:
-            print("Error: No raw test data loaded for the ensemble. `test_data_raw` is empty.")
-            return None
-        print(f"Loaded {len(test_data_raw)} raw audio samples for testing the ensemble.")
-
-        # 2. Initialize your ensemble
-        print("Initializing CNN Ensemble...")
-        model_paths_ensemble = [
-            os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME),
-            os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
-        ]
-
-        for mp in model_paths_ensemble:
-            if not os.path.exists(mp):
-                raise FileNotFoundError(f"Ensemble model component not found: {mp}")
-
-        ensemble_component_feature_types = ['mel', 'cqt']
-        ensemble_model = CnnMelCqtEnsemble(model_paths_ensemble, ensemble_component_feature_types)
-
-        print("Ensemble initialized.")
-
-        print("Evaluating ensemble on the loaded test data...")
-        if not hasattr(ensemble_model, 'evaluate_on_test_data'):
-            print(f"Error: The {type(ensemble_model).__name__} class does not have an 'evaluate_on_test_data' method.")
-            return None
-
-
-        avg_loss, accuracy, true_labels, pred_classes, raw_outputs = ensemble_model.evaluate_on_test_data(
-            test_audio_data=test_data_raw,
-            criterion=criterion
-        )
-        print(f"Ensemble Evaluation Complete. Test Loss: {avg_loss:.4f}, Test Accuracy: {accuracy:.4f}")
-
-        print("Calculating detailed single-label metrics for ensemble...")
-        detailed_metrics = get_all_single_label_metrics(
-            y_true=true_labels,
-            y_pred_classes=pred_classes,
-            y_pred_proba=raw_outputs,
-            class_names=list(DRUM_INSTRUMENTS),
-            num_classes=len(DRUM_INSTRUMENTS)
-        )
-        print("Detailed metrics calculation for ensemble complete.")
-
-        results = {
-            "model_type_display": model_type_display,  # For clarity in results
-            "feature_type_display": "ensemble (mel+cqt)",  # Descriptive
-            "test_loss": float(avg_loss) if hasattr(avg_loss, 'item') else float(avg_loss),
-            "test_acc": float(accuracy) if hasattr(accuracy, 'item') else float(accuracy),
-            "labels": [int(l) for l in true_labels] if true_labels is not None else [],
-            "predictions": [int(p) for p in pred_classes] if pred_classes is not None else [],
-            "outputs": [out.tolist() if hasattr(out, 'tolist') else out for out in
-                        raw_outputs] if raw_outputs is not None else [],
-            **detailed_metrics
-        }
-
-        if "confusion_matrix_calculated_here" in results and results["confusion_matrix_calculated_here"] is not None:
-            cm_value = results["confusion_matrix_calculated_here"]
-            results["confusion_matrix"] = cm_value.tolist() if hasattr(cm_value, 'tolist') else cm_value
-        elif "confusion_matrix" in results and results[
-            "confusion_matrix"] is not None:
-            cm_value = results["confusion_matrix"]
-            results["confusion_matrix"] = cm_value.tolist() if hasattr(cm_value, 'tolist') else cm_value
-
-        return convert_numpy_types(results)
-
-    except ImportError as e:
-        print(f"Error during ensemble evaluation ({model_type_display}): {e} - Check imports for ensemble components.")
-        return None
-    except AttributeError as e:
-        print(
-            f"Error during ensemble evaluation ({model_type_display}): {e} - Likely an issue with a class method or attribute (e.g., 'evaluate_on_test_data' in ensemble).")
-        return None
-    except Exception as e:
-        print(f"An unexpected error occurred during ensemble test set evaluation for {model_type_display}: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-
 def evaluate_on_audio_files(model_type, feature_type):
-    feature_label = feature_type.upper() if feature_type else "ENSEMBLE (MEL+CQT)"
-    print(f"Evaluating {model_type.upper()} model with {feature_label} features on audio files...")
+    print(f"Evaluating {model_type.upper()} model with {feature_type.upper()} features on audio files...")
 
-    use_ensemble = False
     try:
-        if model_type.lower() == ENSEMBLE_MODEL_TYPE:
-            use_ensemble = True
+        model_path = get_model_paths(model_type, feature_type)
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found at: {model_path}")
 
-            model_paths_ensemble = [
-                os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME),
-                os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
-            ]
-
-            for mp in model_paths_ensemble:
-                if not os.path.exists(mp):
-                    raise FileNotFoundError(f"Ensemble model component not found: {mp}")
-
-            ensemble_component_feature_types = ['mel', 'cqt']
-            model = CnnMelCqtEnsemble(model_paths_ensemble, ensemble_component_feature_types)
-            print("Using cnn mel cqt ensemble for audio file evaluation.")
-        else:
-            model_path = get_model_paths(model_type, feature_type)
-            if not os.path.exists(model_path):
-                raise FileNotFoundError(f"Model file not found at: {model_path}")
-
-            ModelClass = get_model_implementation_class(model_type)
-            model = ModelClass(num_classes=len(DRUM_INSTRUMENTS))
-            model.load_state_dict(torch.load(model_path))
-            model.eval()
-            print(f"Loaded {model_type.upper()} model from {model_path} for audio file evaluation.")
+        ModelClass = get_model_implementation_class(model_type)
+        model = ModelClass(num_classes=len(DRUM_INSTRUMENTS))
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+        print(f"Loaded {model_type.upper()} model from {model_path} for audio file evaluation.")
 
         y_true_audio = []
         y_pred_audio = []
@@ -295,14 +150,10 @@ def evaluate_on_audio_files(model_type, feature_type):
                 continue
 
             audio_path = os.path.join(CUTTED_VAL_SETS_PATH, file_name)
-            use_mel = False
-            if feature_type == 'mel':
-                use_mel = True
             predicted_label = classify_instrument_dl(
                 audio_path,
                 model,
-                use_mel_model=use_mel,
-                use_ensemble=use_ensemble
+                use_mel_model=(feature_type == 'mel')
             )
 
             y_true_audio.append(true_label)
@@ -483,65 +334,41 @@ def run_all_evaluations(args):
     all_results = {}
     criterion = torch.nn.CrossEntropyLoss()
 
-    current_model_type = args.model_type.lower()
+    model_type = args.model_type.lower()
+    feature_type = args.feature_type.lower()
 
     print(f"\n--- Preparing for Test Set Evaluation ---")
-    test_results = None
-    if current_model_type == ENSEMBLE_MODEL_TYPE:
-        print(f"Recognized ensemble model type: {current_model_type}. Running ensemble test set evaluation.")
-        test_results = perform_ensemble_test_set_evaluation(criterion=criterion)
-    else:
-        print(f"Recognized single model type: {current_model_type}. Running standard test set evaluation.")
-        effective_feature_type = args.feature_type.lower() if args.feature_type else None
-        if not effective_feature_type:
-            print(
-                f"Warning: feature_type not specified for single model {current_model_type}. This might be an issue for perform_test_set_evaluation.")
-
-        test_results = perform_test_set_evaluation(
-            model_type=current_model_type,
-            feature_type=effective_feature_type,
-            criterion=criterion
-        )
+    test_results = perform_test_set_evaluation(
+        model_type=model_type,
+        feature_type=feature_type,
+        criterion=criterion
+    )
 
     if test_results:
         all_results['test_set_evaluation'] = test_results
-        print(f"Test Set Evaluation completed for {current_model_type}.")
+        print(f"Test Set Evaluation completed for {model_type}.")
         if 'test_acc' in test_results: print(f"  Accuracy: {test_results['test_acc']:.4f}")
     else:
-        print(f"Test Set Evaluation FAILED or returned no results for {current_model_type}.")
+        print(f"Test Set Evaluation FAILED or returned no results for {model_type}.")
 
     print(f"\n--- Preparing for Audio Files Evaluation ---")
-    audio_eval_results = None
-    if current_model_type == ENSEMBLE_MODEL_TYPE:
-        print(f"Recognized ensemble model type: {current_model_type}. Running ensemble audio files evaluation.")
-        audio_eval_results = evaluate_on_audio_files(
-            model_type=current_model_type,
-            feature_type=None
-        )
-    else:
-        print(f"Recognized single model type: {current_model_type}. Running standard audio files evaluation.")
-        effective_feature_type = args.feature_type.lower() if args.feature_type else None
-        audio_eval_results = evaluate_on_audio_files(
-            model_type=current_model_type,
-            feature_type=effective_feature_type
-        )
+    audio_eval_results = evaluate_on_audio_files(
+        model_type=model_type,
+        feature_type=feature_type
+    )
 
     if audio_eval_results:
         all_results['audio_files_evaluation'] = audio_eval_results
-        print(f"Audio Files Evaluation completed for {current_model_type}.")
+        print(f"Audio Files Evaluation completed for {model_type}.")
     else:
-        print(f"Audio Files Evaluation FAILED or returned no results for {current_model_type}.")
-
+        print(f"Audio Files Evaluation FAILED or returned no results for {model_type}.")
 
     if all_results and args.save_results:
-        print(f"\n--- Saving Combined Results for {current_model_type} ---")
-        save_feature_type_tag = "ensemble" if current_model_type == ENSEMBLE_MODEL_TYPE else (
-            args.feature_type.lower() if args.feature_type else "unknown_feature")
-
+        print(f"\n--- Saving Combined Results for {model_type} ---")
         json_path, results_dir = save_combined_results(
             overall_results_dict=all_results,
-            model_type=current_model_type,
-            feature_type=save_feature_type_tag
+            model_type=model_type,
+            feature_type=feature_type
         )
         print(f"Results saved to: {results_dir}")
     elif not all_results:
@@ -555,20 +382,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run comprehensive evaluations (Test Set and Audio Files) for DL models.")
 
-    parser.add_argument('--model-type', type=str, required=True,
-                        choices=['cnn', 'lstm', 'transformer', 'cnn_lstm', ENSEMBLE_MODEL_TYPE],
+    parser.add_argument('--model-type', type=str, required=True, choices=['cnn'],
                         help="Type of model to evaluate.")
-
-    parser.add_argument('--feature-type', type=str, required=True,
-                        choices=['cqt', 'mel', 'ensemble_meta'],
-                        help="Feature type used. For 'ensemble', this might be a general descriptor or ignored if model handles features internally.")
+    parser.add_argument('--feature-type', type=str, required=True, choices=['cqt', 'mel'],
+                        help="Feature type the model was trained on.")
     parser.add_argument('--save-results', action='store_true',
                         help="Save all evaluation results (JSON and CM plots) to disk.")
 
     args = parser.parse_args()
-
-    effective_feature_type = args.feature_type
-    if args.model_type.lower() == ENSEMBLE_MODEL_TYPE and args.feature_type == 'ensemble_meta':
-        effective_feature_type = 'ensemble'
 
     run_all_evaluations(args)

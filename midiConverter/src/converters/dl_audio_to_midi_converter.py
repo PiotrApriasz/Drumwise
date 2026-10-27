@@ -9,21 +9,20 @@ import torch
 from src.data.onset_detection.onset_detector import detect_drum_onsets
 from src.data.onset_detection.onset_processor import extract_drum_segments
 from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
-from src.models.dl_classifiers.classifiers.cnn_mel_cqt_ensemble_classifier import CnnMelCqtEnsemble
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, TO_CONVERT_PATH, MEL_BEST_CNN_MODEL_NAME, \
     CQT_BEST_CNN_MODEL_NAME, TESTING_ONSETS_PATH, CONVERTED_PATH
 
 from src.converters.conversion_utils import set_length, classify_instrument_dl, detect_bpm
 
 
-def classify_drum_segments(segments, sr, model, use_ensemble=False, use_mel_model=False):
+def classify_drum_segments(segments, sr, model, use_mel_model=False):
     instruments = []
     with tempfile.TemporaryDirectory() as temp_dir:
         for i, segment in enumerate(segments):
             temp_file = os.path.join(temp_dir, f"segment_{i}.wav")
             normalized_segment = librosa.util.normalize(segment)
             wavfile.write(temp_file, sr, (normalized_segment * 32767).astype(np.int16))
-            instrument = classify_instrument_dl(temp_file, model, use_ensemble=use_ensemble, use_mel_model=use_mel_model)
+            instrument = classify_instrument_dl(temp_file, model, use_mel_model=use_mel_model)
             instruments.append(instrument)
 
     return instruments
@@ -66,7 +65,7 @@ def create_midi_file(onset_times, instruments, output_path, bpm=120.0, velocitie
     return None
 
 
-def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel_model=False,  use_ensemble=False, save_onsets=False):
+def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel_model=False, save_onsets=False):
 
     audio, sr = librosa.load(audio_path, sr=sr, mono=True)
 
@@ -82,7 +81,7 @@ def convert_audio_to_midi(audio_path, output_midi_path, model, sr=22050, use_mel
         velocity = min(127, max(40, int(energy * 100 * 127)))
         velocities.append(velocity)
 
-    instruments = classify_drum_segments(segments, sr, model, use_ensemble=use_ensemble)
+    instruments = classify_drum_segments(segments, sr, model, use_mel_model=use_mel_model)
 
     if save_onsets:
 
@@ -112,34 +111,18 @@ if __name__ == "__main__":
     audio_to_convert_path = os.path.join(TO_CONVERT_PATH, f"{audio_to_convert}.wav")
     converted_audio_output_dir = os.path.join(CONVERTED_PATH, f"{audio_to_convert}.mid")
 
-    use_ensemble = True
     use_mel_model = False
 
-    if use_ensemble:
-        model_paths = [
-            os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME),
-            os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
-        ]
-        model_types = ['mel', 'cqt']
-        model = CnnMelCqtEnsemble(model_paths, model_types)
-    elif use_mel_model:
-        model_path = os.path.join(TRAINED_DL_MODELS_PATH, MEL_BEST_CNN_MODEL_NAME)
-        model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
-        model.load_state_dict(torch.load(model_path))
-        model.eval()
-    else:
-        model_path = os.path.join(TRAINED_DL_MODELS_PATH, CQT_BEST_CNN_MODEL_NAME)
-        model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
-        model.load_state_dict(torch.load(model_path))
-        model.eval()
+    model_name = MEL_BEST_CNN_MODEL_NAME if use_mel_model else CQT_BEST_CNN_MODEL_NAME
+    model = DrumCNN(num_classes=len(DRUM_INSTRUMENTS))
+    model.load_state_dict(torch.load(os.path.join(TRAINED_DL_MODELS_PATH, model_name)))
+    model.eval()
 
-    
     result = convert_audio_to_midi(
         audio_path=audio_to_convert_path,
         output_midi_path=converted_audio_output_dir,
         model=model,
         use_mel_model=use_mel_model,
-        use_ensemble=use_ensemble,
         save_onsets=True
     )
 

@@ -75,13 +75,11 @@ def detect_bpm(audio, sr):
     return int(estimated_bpm)
 
 
-def classify_instrument_dl(path, model, sr=22050, duration=2, use_ensemble=False, use_mel_model=False):
+def classify_instrument_dl(path, model, sr=22050, duration=2, use_mel_model=False):
     y, _ = librosa.load(path, sr=sr, mono=True)
     y = set_length(y, sr * duration)
     
-    if use_ensemble:
-        pred_idx = model.predict(y, sr)
-    elif use_mel_model:
+    if use_mel_model:
         mel_db = generate_mel_spectrogram(y, sr=sr)
         x = torch.tensor(mel_db, dtype=torch.float).unsqueeze(0).unsqueeze(0)
         
