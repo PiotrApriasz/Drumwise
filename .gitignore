@@ -368,3 +368,18 @@ FodyWeavers.xsd
 api/Drumwise.API/appsettings.Development.json
 
 .env
+
+# macOS
+.DS_Store
+
+# Python
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Scratch outputs
+tempFiles/
