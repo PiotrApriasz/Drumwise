@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(python3 -m py_compile *)",
+      "Bash(python -m py_compile *)",
+      "Bash(flake8 *)"
+    ],
+    "deny": [
+      "Bash(*single_label_trainer*)",
+      "Bash(*tunning_runner*)"
+    ]
+  }
+}

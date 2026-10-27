@@ -1,25 +1,38 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+load_dotenv(REPO_ROOT / ".env")
+
+
+def _path(env_name):
+    """Reads a path from .env; relative paths are resolved against the repository root."""
+    value = os.getenv(env_name)
+    if value is None:
+        return None
+    path = Path(value)
+    return str(path if path.is_absolute() else REPO_ROOT / path)
+
 
 DRUM_INSTRUMENTS = ["snare", "crash", "floor_tom", "hi-hat", "kick", "rack_tom", "ride"]
 
-INSTRUMENTS_DATA_SET_PATH = os.getenv("TRAINING_PATH")
-VAL_SET_PATH = os.getenv("VAL_SET_PATH")
-CUTTED_VAL_SETS_PATH = os.getenv("CUTTED_VAL_SETS_PATH")
-TEST_TRACKS_PATH = os.getenv("TEST_TRACKS_PATH")
-TO_CONVERT_PATH = os.getenv("TO_CONVERT_PATH")
+INSTRUMENTS_DATA_SET_PATH = _path("TRAINING_PATH")
+VAL_SET_PATH = _path("VAL_SET_PATH")
+CUTTED_VAL_SETS_PATH = _path("CUTTED_VAL_SETS_PATH")
+TEST_TRACKS_PATH = _path("TEST_TRACKS_PATH")
+TO_CONVERT_PATH = _path("TO_CONVERT_PATH")
 
-CONVERTED_PATH = os.getenv("CONVERTED_PATH")
-TRAINED_DL_MODELS_PATH = os.getenv("TRAINED_DL_MODELS_PATH")
-TRAINED_ML_MODELS_PATH = os.getenv("TRAINED_ML_MODELS_PATH")
-VISUALIZATIONS_AND_METRICS_BASE_PATH = os.getenv("VISUALTIZATIONS_AND_METRICS_PATH")
-TRIAL_ARTIFACTS_PATH = os.getenv("TRIAL_ARTIFACTS_PATH")
+CONVERTED_PATH = _path("CONVERTED_PATH")
+TRAINED_DL_MODELS_PATH = _path("TRAINED_DL_MODELS_PATH")
+TRAINED_ML_MODELS_PATH = _path("TRAINED_ML_MODELS_PATH")
+VISUALIZATIONS_AND_METRICS_BASE_PATH = _path("VISUALTIZATIONS_AND_METRICS_PATH")
+TRIAL_ARTIFACTS_PATH = _path("TRIAL_ARTIFACTS_PATH")
 
-TESTING_ONSETS_PATH = os.getenv("TESTING_ONSETS_PATH")
+TESTING_ONSETS_PATH = _path("TESTING_ONSETS_PATH")
 
-EVALUATION_RESULTS_PATH = os.getenv("EVALUATION_RESULTS_PATH")
+EVALUATION_RESULTS_PATH = _path("EVALUATION_RESULTS_PATH")
 
 MEL_BEST_CNN_MODEL_NAME = os.getenv("MEL_BEST_CNN_MODEL_NAME")
 CQT_BEST_CNN_MODEL_NAME = os.getenv("CQT_BEST_CNN_MODEL_NAME")
