@@ -133,7 +133,7 @@ midiConverter/src/
 
 ## Known problems in the current code
 
-Found in the review of 2026-10-27, by reading the code and checking the data. Line numbers refer to that state. **Action** says what happens to each problem:
+Found in the review of 2026-10-27, by reading the code and checking the data. Line numbers refer to that state (tag `v0-single-label`; the code has since moved to `src/baseline/`). **Status:** everything except D3, D4, D7 and D8 is fixed or removed (stage 0, steps B1–E). **Action** says what happens to each problem:
 - **Fix (baseline):** fix it when the single-label code is repaired as the two-stage baseline.
 - **Fix (shared):** fix it in code that the new pipeline keeps.
 - **Obsolete:** the code is dropped or replaced, so no fix is needed. The lesson carries over to the new code.
@@ -167,6 +167,7 @@ Found in the review of 2026-10-27, by reading the code and checking the data. Li
 | B10 | `dl_audio_to_midi_converter.py:82` | Velocity is `RMS * 12700` of a normalized segment, so it is almost always 127. | Fix (shared), in the kept MIDI writer. |
 | B11 | `base_classifier.py:248` | `evaluate_model` rebuilds the whole augmented training set (with pitch shift) only to get the test set. | Fix (baseline). |
 | B12 | `dl_audio_to_midi_converter.py:19` | Every segment is written to a temporary WAV and read back before classification. | Fix (baseline). It matters for the latency benchmark. |
+| B13 | `plotting_engine.py:3` | `import sns` instead of `import seaborn as sns`, so the module could not be imported. Found while setting up the native environment. | Fix (baseline). |
 
 ## Stage 0 action plan (agreed 2026-10-27)
 
@@ -181,7 +182,7 @@ Each step is its own commit.
 | B2 | Move the single-label code to `src/baseline/` (a move-only commit, so later diffs stay readable). | Imports and commands updated; nothing else changed. |
 | C | Native environment: `uv` venv with Python 3.12, install requirements, check imports and `torch.backends.mps`. | Every module imports; MPS is available. |
 | D | Data (D1, D2): remove the `cuttedValSets` copies from `training/`; re-split the remaining files by source recording (group key from the filename); add `check_leakage.py`. | Done 2026-10-27 with `src/baseline/data/tools/resplit_training_data.py`. 252 own-kit copies deleted, 16 other own-kit hi-hat files moved to `data/input/ownKitExtra/`, 2,625 files in 417 source groups split 1845 / 407 / 373. The four microphones and the round robins of one library hit stay in one split. `python -m src.data.check_leakage` reports 0 leaks. |
-| E | Fix the remaining "Fix (baseline)" and "Fix (shared)" items except D3 (B2–B12, D5, D6), with small pytest smoke tests for each fixed spot. | `pytest` passes. |
+| E | Fix the remaining "Fix (baseline)" and "Fix (shared)" items except D3 (B2–B12, D5, D6), with small pytest smoke tests for each fixed spot. | Done 2026-10-27: B2–B13, D5 and D6 fixed, 15 tests pass, every module imports. The training loop itself has not been run yet; the first retrain is part of stage 1b. |
 
 D3 (training on short windows) needs a new loader and a retrain, so it moves to stage 1b together with retraining the baseline.
 

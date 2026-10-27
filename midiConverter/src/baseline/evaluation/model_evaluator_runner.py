@@ -8,8 +8,6 @@ import importlib
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report, precision_recall_fscore_support
-from pathlib import Path
 
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, EVALUATION_RESULTS_PATH
 from src.baseline.converters.conversion_utils import extract_true_label, classify_instrument_dl
@@ -131,7 +129,7 @@ def evaluate_on_audio_files(model_type, feature_type):
 
         ModelClass = get_model_implementation_class(model_type)
         model = ModelClass(num_classes=len(DRUM_INSTRUMENTS))
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path, map_location="cpu"))
         model.eval()
         print(f"Loaded {model_type.upper()} model from {model_path} for audio file evaluation.")
 
@@ -164,8 +162,6 @@ def evaluate_on_audio_files(model_type, feature_type):
             print("No valid audio files processed. Skipping audio file metrics calculation.")
             return None
 
-        unique_true_labels = set(y_true_audio)
-        unique_pred_labels = set(y_pred_audio)
         instrument_to_idx = {instrument: idx for idx, instrument in enumerate(DRUM_INSTRUMENTS)}
 
         # Convert string labels to numeric indices if needed

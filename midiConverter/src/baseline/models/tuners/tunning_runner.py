@@ -1,13 +1,11 @@
-import torch
 import optuna
-import os
 import argparse
 import sys
 import functools
 import traceback
 import importlib
 
-from src.constants import *
+from src.constants import EPOCHS, PATIENCE, BATCH_SIZE, NUM_WORKERS, AUGUMENT_FACTOR, TRIAL_ARTIFACTS_PATH, SEED
 
 DEFAULT_TUNING_EPOCHS = EPOCHS // 3 if EPOCHS > 5 else 10
 DEFAULT_TUNING_PATIENCE = PATIENCE // 2 if PATIENCE > 2 else 3
@@ -60,6 +58,7 @@ if __name__ == "__main__":
     parser.add_argument('--num-workers', type=int, default=NUM_WORKERS, help=f"DataLoader workers (default: {NUM_WORKERS}).")
     parser.add_argument('--augment-factor', type=int, default=AUGUMENT_FACTOR, help=f"Augmentation factor (default: {AUGUMENT_FACTOR}).")
     parser.add_argument('--base-save-dir', type=str, default=TRIAL_ARTIFACTS_PATH, help="Base directory to save trial artifacts.")
+    parser.add_argument('--seed', type=int, default=SEED, help=f"Random seed used for every trial (default: {SEED}).")
 
     # Search space boundaries (optional overrides)
     parser.add_argument('--lr-low', type=float, default=DEFAULT_LR_LOW)
@@ -116,8 +115,8 @@ if __name__ == "__main__":
         print(f"Number of finished trials: {len(study.trials)}")
         best_trial = study.best_trial
         print("\n--- Best Trial Found ---")
-        print(f"Value (Best Validation Accuracy): {best_trial.value:.5f}")
-        print("\nBest Parameters (for easy copying to constants.py / .env):")
+        print(f"Value (Best Validation Macro-F1): {best_trial.value:.5f}")
+        print("\nBest Parameters (copy into .env; the trainer reads all of them from there):")
 
         model_prefix = args.model_type.upper()
 
@@ -133,9 +132,9 @@ if __name__ == "__main__":
                  const_name = f"{model_prefix}_LABEL_SMOOTHING"
                  print(f"{const_name}={value:.4f}")
             elif key == 'dropout_rate':
-                 print(f"# Suggested {model_prefix} Model Param: dropout_rate={value:.4f}")
+                 print(f"{model_prefix}_DROPOUT_RATE={value:.4f}")
             elif key.startswith('num_filters'):
-                 print(f"# Suggested {model_prefix} Model Param: {key}={value}")
+                 print(f"{model_prefix}_{key.upper()}={value}")
             else:
                  print(f"# Suggested {model_prefix} Param: {key.upper()}={value}")
         print("# -------------------------")

@@ -1,7 +1,5 @@
 import numpy as np
 import librosa
-import pretty_midi
-from scipy.io import wavfile
 
 
 def detect_drum_onsets(audio, sr):

@@ -1,17 +1,17 @@
 from datetime import datetime
 import json
 
-import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import CosineAnnealingLR
 import os
 import argparse
 import importlib
-import sys
 
 from src import constants
-from src.constants import *
+from src.constants import TRAINED_DL_MODELS_PATH, EVALUATION_RESULTS_PATH, SEED, EPOCHS, PATIENCE, BATCH_SIZE, \
+    NUM_WORKERS, AUGUMENT_FACTOR, CNN_LEARNING_RATE, CNN_WEIGHT_DECAY, CNN_LABEL_SMOOTHING
 from src.baseline.evaluation.model_evaluator_runner import convert_numpy_types
+from src.baseline.models.dl_classifiers.classifiers.cnn_classifier import build_cnn_optimization
+from src.reproducibility import set_seed
 
 
 def get_classifier_class(model_type: str):
@@ -65,17 +65,20 @@ def train_and_evaluate_model(args):
 
     print("Loading configuration...")
 
-    epochs = args.epochs if args.epochs is not None else int(EPOCHS)
-    patience = args.patience if args.patience is not None else int(PATIENCE)
-    batch_size = args.batch_size if args.batch_size is not None else int(BATCH_SIZE)
-    num_workers = args.num_workers if args.num_workers is not None else int(NUM_WORKERS)
-    augment_factor = args.augment_factor if args.augment_factor is not None else int(AUGUMENT_FACTOR)
+    seed = args.seed if args.seed is not None else SEED
+    epochs = args.epochs if args.epochs is not None else EPOCHS
+    patience = args.patience if args.patience is not None else PATIENCE
+    batch_size = args.batch_size if args.batch_size is not None else BATCH_SIZE
+    num_workers = args.num_workers if args.num_workers is not None else NUM_WORKERS
+    augment_factor = args.augment_factor if args.augment_factor is not None else AUGUMENT_FACTOR
 
     # Model-specific hyperparameters
     if MODEL_TYPE == 'cnn':
-        lr = args.lr if args.lr is not None else float(CNN_LEARNING_RATE)
-        weight_decay = args.weight_decay if args.weight_decay is not None else float(CNN_WEIGHT_DECAY)
-        label_smoothing = args.label_smoothing if args.label_smoothing is not None else float(CNN_LABEL_SMOOTHING)
+        lr = args.lr if args.lr is not None else CNN_LEARNING_RATE
+        weight_decay = args.weight_decay if args.weight_decay is not None else CNN_WEIGHT_DECAY
+        label_smoothing = args.label_smoothing if args.label_smoothing is not None else CNN_LABEL_SMOOTHING
+
+    set_seed(seed)
 
     try:
         FINAL_MODEL_PATH, BEST_MODEL_PATH = get_model_paths(MODEL_TYPE, FEATURE_TYPE)
@@ -87,7 +90,7 @@ def train_and_evaluate_model(args):
     print(f"--- Final Configuration ---")
     print(f"Model Type: {MODEL_TYPE.upper()}")
     print(f"Feature Type: {FEATURE_TYPE.upper()}")
-    print(f"Epochs: {epochs}, Patience: {patience}")
+    print(f"Seed: {seed}, Epochs: {epochs}, Patience: {patience}")
     print(f"Batch Size: {batch_size}, Num Workers: {num_workers}")
     print(f"LR: {lr}, Weight Decay: {weight_decay}, Label Smoothing: {label_smoothing}")
     print(f"Augmentation Factor: {augment_factor}")
@@ -111,9 +114,7 @@ def train_and_evaluate_model(args):
 
     # --- Define Optimizer, Criterion, Scheduler ---
     if MODEL_TYPE == 'cnn':
-        optimizer = torch.optim.Adam(classifier.parameters(), lr=lr, weight_decay=weight_decay)
-        criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
-        scheduler = CosineAnnealingLR(optimizer, T_max=CNN_SCHEDULER_ITERATIONS_NUM, eta_min=CNN_MINIMUM_LEARNING_RATE)
+        optimizer, criterion, scheduler = build_cnn_optimization(classifier, lr, weight_decay, label_smoothing, epochs)
 
     # --- Training ---
     print("\nStarting training...")
@@ -129,10 +130,7 @@ def train_and_evaluate_model(args):
             augment_factor=augment_factor
         )
         print("Training complete.")
-        if 'best_val_acc' in train_history:
-            print(f"Best validation accuracy achieved: {train_history['best_val_acc']:.4f}")
-        else:
-            print("Training finished, best validation accuracy key not found in history.")
+        print(f"Best validation macro-F1 achieved: {train_history['best_val_f1']:.4f}")
 
     except Exception as e:
         print(f"\nError during training: {e}")
@@ -149,7 +147,7 @@ def train_and_evaluate_model(args):
     try:
         eval_results = classifier.evaluate_model(
             model_path=BEST_MODEL_PATH,
-            criterion=criterion, # Use the same criterion
+            criterion=nn.CrossEntropyLoss(),  # unweighted, so test losses are comparable across runs
         )
         print("\nEvaluation complete.")
         if 'test_acc' in eval_results:
@@ -168,7 +166,7 @@ def train_and_evaluate_model(args):
             training_history_path = os.path.join(EVALUATION_RESULTS_PATH,
                                                  training_history_filename)
 
-            history_to_save = convert_numpy_types(train_history)
+            history_to_save = convert_numpy_types({**train_history, "seed": seed})
 
             with open(training_history_path, 'w') as f:
                 json.dump(history_to_save, f, indent=2)
@@ -198,6 +196,7 @@ if __name__ == "__main__":
     parser.add_argument('--augment-factor', type=int, default=None, help=f"Data augmentation factor (default from constants: {AUGUMENT_FACTOR}).")
     parser.add_argument('--label-smoothing', type=float, default=None, help="Label smoothing factor (default from model-specific constants).")
     parser.add_argument('--num-workers', type=int, default=None, help=f"Number of DataLoader workers (default from constants: {NUM_WORKERS}).")
+    parser.add_argument('--seed', type=int, default=None, help=f"Random seed (default from constants: {SEED}).")
 
     args = parser.parse_args()
 

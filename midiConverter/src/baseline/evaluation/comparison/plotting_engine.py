@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import sns
+import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve
 
@@ -205,7 +205,7 @@ def plot_class_performance(results_dict, metric='f1-score',
     df = pd.DataFrame(class_metrics, index=model_names)
 
     # Plot
-    ax = df.plot(kind='bar', figsize=figsize, width=0.8)
+    df.plot(kind='bar', figsize=figsize, width=0.8)
 
     plt.title(title)
     plt.ylabel(metric.title())

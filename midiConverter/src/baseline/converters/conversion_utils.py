@@ -75,24 +75,22 @@ def detect_bpm(audio, sr):
     return int(estimated_bpm)
 
 
+def classify_audio_dl(y, model, sr=22050, duration=2, use_mel_model=False):
+    """Classifies one hit given as a mono signal at `sr`, padded or trimmed to `duration` seconds."""
+    y = set_length(y, sr * duration)
+
+    if use_mel_model:
+        features = generate_mel_spectrogram(y, sr=sr)
+    else:
+        features = generate_cqt_spectrogram(y, sr=sr)
+    device = next(model.parameters()).device
+    x = torch.tensor(features, dtype=torch.float, device=device).unsqueeze(0).unsqueeze(0)
+
+    with torch.no_grad():
+        pred_idx = model(x).argmax(dim=1).item()
+    return DRUM_INSTRUMENTS[pred_idx]
+
+
 def classify_instrument_dl(path, model, sr=22050, duration=2, use_mel_model=False):
     y, _ = librosa.load(path, sr=sr, mono=True)
-    y = set_length(y, sr * duration)
-    
-    if use_mel_model:
-        mel_db = generate_mel_spectrogram(y, sr=sr)
-        x = torch.tensor(mel_db, dtype=torch.float).unsqueeze(0).unsqueeze(0)
-        
-        with torch.no_grad():
-            outputs = model(x)
-            pred_idx = outputs.argmax(dim=1).item()
-    else:
-        cqt_db = generate_cqt_spectrogram(y, sr=sr)
-        x = torch.tensor(cqt_db, dtype=torch.float).unsqueeze(0).unsqueeze(0)
-
-        with torch.no_grad():
-            outputs = model(x)
-            pred_idx = outputs.argmax(dim=1).item()
-
-    label_map = {i: inst for i, inst in enumerate(DRUM_INSTRUMENTS)}
-    return label_map[pred_idx]
+    return classify_audio_dl(y, model, sr=sr, duration=duration, use_mel_model=use_mel_model)

@@ -37,15 +37,19 @@ CQT_BEST_CNN_MODEL_NAME = os.getenv("CQT_BEST_CNN_MODEL_NAME")
 MEL_CNN_MODEL_NAME = os.getenv("MEL_CNN_MODEL_NAME")
 CQT_CNN_MODEL_NAME = os.getenv("CQT_CNN_MODEL_NAME")
 
-BATCH_SIZE = os.getenv("BATCH_SIZE")
-NUM_WORKERS = os.getenv("NUM_WORKERS")
-EPOCHS = os.getenv("EPOCHS")
-PATIENCE = os.getenv("PATIENCE")
-AUGUMENT_FACTOR = os.getenv("AUGUMENT_FACTOR")
+# Numeric settings are parsed here, once, so the rest of the code gets ints and floats.
+SEED = int(os.getenv("SEED", "42"))
 
-CNN_LEARNING_RATE = os.getenv("CNN_LEARNING_RATE")
-CNN_DROPOUT_RATE = os.getenv("CNN_DROPOUT_RATE")
-CNN_WEIGHT_DECAY = os.getenv("CNN_WEIGHT_DECAY")
-CNN_LABEL_SMOOTHING = os.getenv("CNN_LABEL_SMOOTHING")
-CNN_SCHEDULER_ITERATIONS_NUM = 10
-CNN_MINIMUM_LEARNING_RATE = 1e-6
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "8"))
+NUM_WORKERS = int(os.getenv("NUM_WORKERS", "4"))
+EPOCHS = int(os.getenv("EPOCHS", "50"))
+PATIENCE = int(os.getenv("PATIENCE", "6"))
+AUGUMENT_FACTOR = int(os.getenv("AUGUMENT_FACTOR", "2"))
+
+CNN_LEARNING_RATE = float(os.getenv("CNN_LEARNING_RATE", "0.000103"))
+CNN_DROPOUT_RATE = float(os.getenv("CNN_DROPOUT_RATE", "0.287"))
+CNN_WEIGHT_DECAY = float(os.getenv("CNN_WEIGHT_DECAY", "1.98e-05"))
+CNN_LABEL_SMOOTHING = float(os.getenv("CNN_LABEL_SMOOTHING", "0.1"))
+CNN_NUM_FILTERS1 = int(os.getenv("CNN_NUM_FILTERS1", "16"))
+CNN_NUM_FILTERS2 = int(os.getenv("CNN_NUM_FILTERS2", "32"))
+CNN_MINIMUM_LEARNING_RATE = float(os.getenv("CNN_MINIMUM_LEARNING_RATE", "1e-6"))

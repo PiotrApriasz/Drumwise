@@ -4,13 +4,9 @@ import numpy as np
 
 
 def time_shift(audio, sr, max_shift_s=0.1):
-    max_shift = int(max_shift_s * sr)
-    shift = random.randint(-max_shift, max_shift)
-    if shift >= 0:
-        audio = np.pad(audio, (shift, 0), mode='constant')[:len(audio)]
-    else:
-        audio = np.pad(audio, (0, -shift), mode='constant')[-len(audio):]
-    return audio
+    """Delays the hit by up to `max_shift_s`. Shifting earlier would cut off the attack (review item B7)."""
+    shift = random.randint(0, int(max_shift_s * sr))
+    return np.pad(audio, (shift, 0), mode='constant')[:len(audio)]
 
 def gain_change(audio, min_gain_db=-6, max_gain_db=6):
     gain_db = random.uniform(min_gain_db, max_gain_db)

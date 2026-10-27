@@ -1,15 +1,17 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from abc import ABC, abstractmethod
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score
 import os
-import time  # Added for timing
+import time
 
 from src.baseline.data.dataset.dataset_augumentation import create_augmented_dataset
 from src.baseline.data.feature_extraction.spectogram_generator import generate_cqt_spectrogram, generate_mel_spectrogram
-from src.constants import DRUM_INSTRUMENTS
-from src.baseline.data.dataset.single_label_dataset_loader import load_dataset_with_splits
+from src.constants import DRUM_INSTRUMENTS, INSTRUMENTS_DATA_SET_PATH
+from src.baseline.data.dataset.single_label_dataset_loader import load_subset
+from src.reproducibility import get_device
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
 
@@ -69,6 +71,42 @@ class MelDrumDataset(BaseDrumDataset):
         return x, y
 
 
+# --- Training helpers ---
+
+def compute_class_weights(labels, num_classes):
+    """Inverse-frequency ("balanced") class weights: n_samples / (n_present_classes * count) (review item D5).
+
+    Each present class then contributes the same total weight; absent classes get 0.
+    """
+    counts = np.bincount(np.asarray(labels), minlength=num_classes).astype(np.float64)
+    weights = np.zeros(num_classes)
+    present = counts > 0
+    weights[present] = counts.sum() / (present.sum() * counts[present])
+    return torch.tensor(weights, dtype=torch.float)
+
+
+class EarlyStopping:
+    """Tracks the best validation score; an improving epoch resets the counter (review item B5)."""
+
+    def __init__(self, patience):
+        self.patience = patience
+        self.best = float('-inf')
+        self.epochs_no_improve = 0
+
+    def step(self, score) -> bool:
+        """Records one epoch and returns True when `score` is a new best."""
+        if score > self.best:
+            self.best = score
+            self.epochs_no_improve = 0
+            return True
+        self.epochs_no_improve += 1
+        return False
+
+    @property
+    def should_stop(self) -> bool:
+        return self.epochs_no_improve >= self.patience
+
+
 # --- Abstract Base Classifier ---
 
 class BaseClassifier(nn.Module, ABC):
@@ -81,6 +119,8 @@ class BaseClassifier(nn.Module, ABC):
         self.num_workers = num_workers
         self.model = self._build_model()
         self.label_map = label_map
+        self.device = get_device()
+        self.to(self.device)
 
         if self.feature_type not in ['cqt', 'mel']:
             raise ValueError("feature_type must be 'cqt' or 'mel'")
@@ -104,8 +144,9 @@ class BaseClassifier(nn.Module, ABC):
             raise ValueError("Invalid feature_type specified.")
 
     def _create_datasets(self, augment_factor=2):
-        """Loads raw data and creates train, validation, and test datasets."""
-        train_data, val_data, test_data = load_dataset_with_splits()
+        """Loads raw data and creates train and validation datasets. The test split is never loaded here."""
+        train_data = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, "train"), DRUM_INSTRUMENTS, self.sr)
+        val_data = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, "val"), DRUM_INSTRUMENTS, self.sr)
         if augment_factor > 0:
             print(f"Creating augmented dataset with factor {augment_factor}...")
             train_data_aug = create_augmented_dataset(train_data, sr=self.sr, augment_factor=augment_factor)
@@ -116,20 +157,19 @@ class BaseClassifier(nn.Module, ABC):
         DatasetClass = self._get_dataset_class()
         train_dataset = DatasetClass(train_data_aug, self.label_map, sr=self.sr)
         val_dataset = DatasetClass(val_data, self.label_map, sr=self.sr)
-        test_dataset = DatasetClass(test_data, self.label_map, sr=self.sr)
 
-        print(f"Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}, Test={len(test_dataset)}")
-        return train_dataset, val_dataset, test_dataset
+        print(f"Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}")
+        return train_dataset, val_dataset
 
-    def _create_dataloaders(self, train_dataset, val_dataset, test_dataset):
-        """Creates DataLoaders for the datasets."""
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True,
-                                  num_workers=self.num_workers) if train_dataset is not None else None
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False,
-                                num_workers=self.num_workers) if val_dataset is not None else None
-        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False,
-                                 num_workers=self.num_workers) if test_dataset is not None else None
-        return train_loader, val_loader, test_loader
+    def _create_test_dataset(self):
+        """Loads only the test split (review item B11: no augmented training set is built for evaluation)."""
+        test_data = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, "test"), DRUM_INSTRUMENTS, self.sr)
+        return self._get_dataset_class()(test_data, self.label_map, sr=self.sr)
+
+    def _create_loader(self, dataset, shuffle):
+        # macOS starts workers with spawn, which pickles the in-memory dataset; persistent workers do it once
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle, num_workers=self.num_workers,
+                          persistent_workers=self.num_workers > 0)
 
     def _train_epoch(self, train_loader, optimizer, criterion):
         """Runs a single training epoch."""
@@ -137,57 +177,58 @@ class BaseClassifier(nn.Module, ABC):
         train_loss = 0
         epoch_start_time = time.time()
         for x_batch, y_batch in train_loader:
+            x_batch, y_batch = x_batch.to(self.device), y_batch.to(self.device)
             optimizer.zero_grad()
             outputs = self.model(x_batch)
             loss = criterion(outputs, y_batch)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-        epoch_end_time = time.time()
-        epoch_duration = epoch_end_time - epoch_start_time
+        epoch_duration = time.time() - epoch_start_time
         return train_loss / len(train_loader), epoch_duration
 
     def _evaluate(self, data_loader, criterion):
         """Evaluates the model on a given dataloader."""
         self.model.eval()
         total_loss = 0
-        correct = 0
-        total = 0
         all_labels = []
         all_preds = []
         all_outputs = []
         with torch.no_grad():
             for x_batch, y_batch in data_loader:
+                x_batch, y_batch = x_batch.to(self.device), y_batch.to(self.device)
                 outputs = self.model(x_batch)
-                loss = criterion(outputs, y_batch)
-                total_loss += loss.item()
+                total_loss += criterion(outputs, y_batch).item()
 
                 all_outputs.extend(outputs.cpu().numpy())
-
-                preds = outputs.argmax(dim=1)
-                correct += (preds == y_batch).sum().item()
-                total += y_batch.size(0)
-                all_preds.extend(preds.cpu().numpy())
+                all_preds.extend(outputs.argmax(dim=1).cpu().numpy())
                 all_labels.extend(y_batch.cpu().numpy())
 
         avg_loss = total_loss / len(data_loader)
-        accuracy = correct / total if total > 0 else 0
+        accuracy = float(np.mean(np.array(all_preds) == np.array(all_labels))) if all_labels else 0
         return avg_loss, accuracy, all_labels, all_preds, all_outputs
 
     def train_model(self, save_path, best_model_save_path, optimizer, criterion, scheduler=None,
-                    epochs=50, patience=6, augment_factor=2):
-        """Full training loop with validation, early stopping, and model saving."""
+                    epochs=50, patience=6, augment_factor=2, class_weighted=True):
+        """Full training loop with validation, early stopping on macro-F1, and model saving."""
 
-        train_dataset, val_dataset, test_dataset = self._create_datasets(augment_factor=augment_factor)
-        train_loader, val_loader, _ = self._create_dataloaders(train_dataset, val_dataset, test_dataset)
+        train_dataset, val_dataset = self._create_datasets(augment_factor=augment_factor)
+        train_loader = self._create_loader(train_dataset, shuffle=True)
+        val_loader = self._create_loader(val_dataset, shuffle=False)
 
+        if class_weighted and isinstance(criterion, nn.CrossEntropyLoss):
+            train_labels = [self.label_map[label] for _, label in train_dataset.data]
+            criterion.weight = compute_class_weights(train_labels, self.num_classes)
+            print(f"Class weights: {criterion.weight.numpy().round(3).tolist()}")
+        criterion.to(self.device)
+
+        early_stopping = EarlyStopping(patience)
         best_val_acc = 0
-        best_val_loss = float('inf')
-        epochs_no_improve = 0
 
         train_losses = []
         val_losses = []
         val_accs = []
+        val_f1s = []
         epoch_times = []
 
         for epoch in range(epochs):
@@ -195,12 +236,15 @@ class BaseClassifier(nn.Module, ABC):
             train_losses.append(train_loss)
             epoch_times.append(epoch_duration)
 
-            val_loss, val_acc, _, _, _ = self._evaluate(val_loader, criterion)
+            val_loss, val_acc, val_labels, val_preds, _ = self._evaluate(val_loader, criterion)
+            val_f1 = f1_score(val_labels, val_preds, average='macro', zero_division=0)
             val_losses.append(val_loss)
             val_accs.append(val_acc)
+            val_f1s.append(val_f1)
 
             print(
-                f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Epoch Time: {epoch_duration:.2f}s")
+                f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, "
+                f"Val Acc: {val_acc:.4f}, Val Macro-F1: {val_f1:.4f}, Epoch Time: {epoch_duration:.2f}s")
 
             if scheduler:
                 if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -208,25 +252,18 @@ class BaseClassifier(nn.Module, ABC):
                 else:
                     scheduler.step()
 
-            if val_acc > best_val_acc:
+            if early_stopping.step(val_f1):
                 best_val_acc = val_acc
+                os.makedirs(os.path.dirname(best_model_save_path), exist_ok=True)
                 torch.save(self.model.state_dict(), best_model_save_path)
-                print(f"Saved best model (Val Acc: {best_val_acc:.4f}) to {best_model_save_path}")
-                epochs_no_improve = 0
+                print(f"Saved best model (Val Macro-F1: {val_f1:.4f}) to {best_model_save_path}")
 
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-            if val_acc <= best_val_acc and epoch > 0:
-                epochs_no_improve += 1
-            else:
-                epochs_no_improve = 0
-
-            print(f"Epochs without validation accuracy improvement: {epochs_no_improve}/{patience}")
-            if epochs_no_improve >= patience:
+            print(f"Epochs without validation macro-F1 improvement: {early_stopping.epochs_no_improve}/{patience}")
+            if early_stopping.should_stop:
                 print(f"Early stopping triggered after {epoch + 1} epochs.")
                 break
 
-        print(f"Training finished. Best validation accuracy: {best_val_acc:.4f}")
+        print(f"Training finished. Best validation macro-F1: {early_stopping.best:.4f}")
 
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         torch.save(self.model.state_dict(), save_path)
@@ -236,21 +273,22 @@ class BaseClassifier(nn.Module, ABC):
             "train_losses": train_losses,
             "val_losses": val_losses,
             "val_accs": val_accs,
+            "val_f1s": val_f1s,
+            "best_val_f1": early_stopping.best,
             "best_val_acc": best_val_acc,
             "epoch_times": epoch_times
         }
 
     def evaluate_model(self, model_path, criterion):
         """Loads a trained model and evaluates it on the test set."""
-        self.model.load_state_dict(torch.load(model_path))
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
+        criterion.to(self.device)
 
-        _, _, test_dataset = self._create_datasets(augment_factor=2)
-        _, _, test_loader = self._create_dataloaders(None, None, test_dataset)
-
+        test_loader = self._create_loader(self._create_test_dataset(), shuffle=False)
         test_loss, test_acc, all_labels, all_preds, all_outputs = self._evaluate(test_loader, criterion)
 
-        cm = confusion_matrix(all_labels, all_preds)
+        cm = confusion_matrix(all_labels, all_preds, labels=list(range(self.num_classes)))
         class_names = list(DRUM_INSTRUMENTS)
 
         print(f"Test Loss: {test_loss:.4f}")
