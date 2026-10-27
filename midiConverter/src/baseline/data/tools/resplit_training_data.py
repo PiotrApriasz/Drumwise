@@ -65,10 +65,16 @@ def group_files(files: list[Path]) -> dict[str, list[Path]]:
         else:
             first_key_of_hash[digest] = key
 
-    groups = defaultdict(list)
+    merged = defaultdict(list)
     for path in files:
-        groups[find(keys[path])].append(path)
-    return groups
+        merged[find(keys[path])].append(path)
+    # Name each group by its smallest member key and sort its files, so the result depends only on the set of
+    # files and not on the folders they currently sit in (re-running the script is then a no-op).
+    groups = {}
+    for paths in merged.values():
+        paths.sort(key=lambda p: (p.parent.name, p.name))
+        groups[min(keys[p] for p in paths)] = paths
+    return dict(sorted(groups.items()))
 
 
 def assign_splits(groups: dict[str, list[Path]], rng: random.Random) -> dict[str, str]:
@@ -97,7 +103,8 @@ def main():
     args = parser.parse_args()
 
     root = Path(INSTRUMENTS_DATA_SET_PATH)
-    files = sorted(p for split in SPLITS for p in (root / split).glob("*/*.wav"))
+    files = sorted((p for split in SPLITS for p in (root / split).glob("*/*.wav")),
+                   key=lambda p: (p.parent.name, p.name, p.parent.parent.name))
     cutted_hashes = {md5(p) for p in Path(CUTTED_VAL_SETS_PATH).glob("*.wav")}
 
     own_kit = [p for p in files if OWN_KIT_PATTERN.match(p.name)]
@@ -121,6 +128,8 @@ def main():
             targets[dst] = path
             moves.append((path, dst))
     print(f"identical duplicates to delete: {len(duplicates)}")
+    moves = [(src, dst) for src, dst in moves if src != dst]
+    print(f"files changing split: {len(moves)}")
 
     print(f"own-kit copies of cuttedValSets to delete: {len(to_delete)}")
     print(f"other own-kit files to move to {OWN_KIT_EXTRA}: {len(to_extra)}")
