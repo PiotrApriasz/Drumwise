@@ -11,14 +11,14 @@ import sys
 
 from src import constants
 from src.constants import *
-from src.evaluation.model_evaluator_runner import convert_numpy_types
+from src.baseline.evaluation.model_evaluator_runner import convert_numpy_types
 
 
 def get_classifier_class(model_type: str):
     """Dynamically imports and returns the classifier class based on model_type."""
     model_type = model_type.lower()
     if model_type == 'cnn':
-        module_path = 'src.models.dl_classifiers.classifiers.cnn_classifier'
+        module_path = 'src.baseline.models.dl_classifiers.classifiers.cnn_classifier'
         class_name = 'DrumCNNClassifier'
     else:
         raise ValueError(f"Unknown model type: {model_type}.")

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.constants import DRUM_INSTRUMENTS, CNN_DROPOUT_RATE
-from src.models.dl_classifiers.classifiers.base_classifier import BaseClassifier
+from src.baseline.models.dl_classifiers.classifiers.base_classifier import BaseClassifier
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
 

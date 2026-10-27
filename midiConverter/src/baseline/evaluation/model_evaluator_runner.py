@@ -12,15 +12,15 @@ from sklearn.metrics import confusion_matrix, classification_report, precision_r
 from pathlib import Path
 
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, EVALUATION_RESULTS_PATH
-from src.converters.conversion_utils import extract_true_label, classify_instrument_dl
-from src.evaluation.metrics.single_label_metrics import get_all_single_label_metrics
+from src.baseline.converters.conversion_utils import extract_true_label, classify_instrument_dl
+from src.baseline.evaluation.metrics.single_label_metrics import get_all_single_label_metrics
 
 
 def get_classifier_class(model_type: str):
     model_type = model_type.lower()
 
     if model_type == 'cnn':
-        module_path = 'src.models.dl_classifiers.classifiers.cnn_classifier'
+        module_path = 'src.baseline.models.dl_classifiers.classifiers.cnn_classifier'
         class_name = 'DrumCNNClassifier'
     else:
         raise ValueError(f"Unknown model type: {model_type}.")
@@ -41,7 +41,7 @@ def get_model_implementation_class(model_type: str):
     model_type = model_type.lower()
 
     if model_type == 'cnn':
-        module_path = 'src.models.dl_classifiers.classifiers.cnn_classifier'
+        module_path = 'src.baseline.models.dl_classifiers.classifiers.cnn_classifier'
         class_name = 'DrumCNN'
     else:
         raise ValueError(f"Unknown model type: {model_type}.")

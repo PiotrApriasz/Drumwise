@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 from src.constants import (DRUM_INSTRUMENTS)
-from src.data.feature_extraction.spectogram_generator import generate_mel_spectrogram, generate_cqt_spectrogram
+from src.baseline.data.feature_extraction.spectogram_generator import generate_mel_spectrogram, generate_cqt_spectrogram
 
 
 def extract_true_label(file_name: str) -> str:

@@ -6,10 +6,10 @@ from sklearn.metrics import confusion_matrix
 import os
 import time  # Added for timing
 
-from src.data.dataset.dataset_augumentation import create_augmented_dataset
-from src.data.feature_extraction.spectogram_generator import generate_cqt_spectrogram, generate_mel_spectrogram
+from src.baseline.data.dataset.dataset_augumentation import create_augmented_dataset
+from src.baseline.data.feature_extraction.spectogram_generator import generate_cqt_spectrogram, generate_mel_spectrogram
 from src.constants import DRUM_INSTRUMENTS
-from src.data.dataset.single_label_dataset_loader import load_dataset_with_splits
+from src.baseline.data.dataset.single_label_dataset_loader import load_dataset_with_splits
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
 

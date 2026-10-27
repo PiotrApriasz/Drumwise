@@ -5,9 +5,9 @@ import os
 import traceback
 
 try:
-    from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNNClassifier
+    from src.baseline.models.dl_classifiers.classifiers.cnn_classifier import DrumCNNClassifier
 except ImportError:
-    print("Error: Failed to import DrumCNNClassifier from src.models.dl_classifiers.classifiers.cnn_classifier")
+    print("Error: Failed to import DrumCNNClassifier from src.baseline.models.dl_classifiers.classifiers.cnn_classifier")
     raise
 
 def objective_cnn(trial, feature_type, args) -> float:

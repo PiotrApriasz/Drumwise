@@ -30,9 +30,9 @@ Run modules from `midiConverter/` with `python -m` so `src.*` imports resolve:
 
 ```bash
 python run_script.py                           # interactive menu of the train/eval commands
-python -m src.models.dl_classifiers.trainer.single_label_trainer --model-type cnn --feature-type cqt   # optional: --epochs --patience --batch-size --lr --weight-decay --label-smoothing --augment-factor --num-workers
-python -m src.evaluation.model_evaluator_runner --model-type cnn --feature-type mel --save-results
-python -m src.models.tuners.tunning_runner --model-type cnn --feature-type cqt --n-trials 50 [--storage sqlite:///tuning.db]
+python -m src.baseline.models.dl_classifiers.trainer.single_label_trainer --model-type cnn --feature-type cqt   # optional: --epochs --patience --batch-size --lr --weight-decay --label-smoothing --augment-factor --num-workers
+python -m src.baseline.evaluation.model_evaluator_runner --model-type cnn --feature-type mel --save-results
+python -m src.baseline.models.tuners.tunning_runner --model-type cnn --feature-type cqt --n-trials 50 [--storage sqlite:///tuning.db]
 ```
 
 The canonical command strings live in `script_running_constants.py`. pytest and flake8 are installed, but there is no test suite.
@@ -43,7 +43,7 @@ Only the **CNN** classifier exists. The trainer, tuner and evaluator accept only
 
 ### Architecture
 
-The task is **single-label classification of short drum hits** into the 7 classes of `DRUM_INSTRUMENTS` (`snare, crash, floor_tom, hi-hat, kick, rack_tom, ride`). Label indices follow that list's order everywhere. A full track is turned into MIDI by onset detection followed by per-segment classification.
+The current code is the single-label baseline. It lives in `src/baseline/`, and the paths below are relative to that folder. Only `src/constants.py` sits outside it. The task is **single-label classification of short drum hits** into the 7 classes of `DRUM_INSTRUMENTS` (`snare, crash, floor_tom, hi-hat, kick, rack_tom, ride`). Label indices follow that list's order everywhere. A full track is turned into MIDI by onset detection followed by per-segment classification.
 
 - **Data loading**: `data/dataset/single_label_dataset_loader.py` reads `TRAINING_PATH/{train,val,test}/<instrument>/*.wav`, resamples to 22050 Hz mono, pads or trims to 2 s, and normalizes. Augmentation (`dataset_augumentation.py`) expands only the training split by `augment_factor`.
 - **Features**: `feature_type` is `cqt` or `mel`. Spectrograms are computed on the fly in the Dataset `__getitem__` (`CqtDrumDataset` / `MelDrumDataset` in `base_classifier.py`, using `feature_extraction/spectogram_generator.py`). They are not precomputed.

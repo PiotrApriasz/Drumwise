@@ -6,13 +6,13 @@ import tempfile
 from scipy.io import wavfile
 import torch
 
-from src.data.onset_detection.onset_detector import detect_drum_onsets
-from src.data.onset_detection.onset_processor import extract_drum_segments
-from src.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
+from src.baseline.data.onset_detection.onset_detector import detect_drum_onsets
+from src.baseline.data.onset_detection.onset_processor import extract_drum_segments
+from src.baseline.models.dl_classifiers.classifiers.cnn_classifier import DrumCNN
 from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, TO_CONVERT_PATH, MEL_BEST_CNN_MODEL_NAME, \
     CQT_BEST_CNN_MODEL_NAME, TESTING_ONSETS_PATH, CONVERTED_PATH
 
-from src.converters.conversion_utils import set_length, classify_instrument_dl, detect_bpm
+from src.baseline.converters.conversion_utils import set_length, classify_instrument_dl, detect_bpm
 
 
 def classify_drum_segments(segments, sr, model, use_mel_model=False):

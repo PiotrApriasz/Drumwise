@@ -26,7 +26,7 @@ def load_objective_function(model_type: str):
     model_type = model_type.lower()
     try:
         if model_type == 'cnn':
-            module = importlib.import_module(".cnn_objective", package="src.models.tuners")
+            module = importlib.import_module(".cnn_objective", package="src.baseline.models.tuners")
             return module.objective_cnn
         else:
             raise ValueError(f"Unsupported model type for tuning: {model_type}")
