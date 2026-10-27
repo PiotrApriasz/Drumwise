@@ -105,7 +105,7 @@ The first output of the harness is an honest number for the **current** pipeline
 
 | Keep (possibly moved) | Change | Drop or archive |
 |---|---|---|
-| `.env` + `constants.py` pattern (Docker already removed) | `spectogram_generator.py` → causal log-mel with cache | `src/depracated/` |
+| `.env` + `constants.py` pattern (Docker already removed) | `spectogram_generator.py` → causal log-mel with cache (log-mel done in `src/data/features.py`, cache still to do) | `src/depracated/` |
 | `create_midi_file` and the GM note map | `base_classifier.py` train loop → generic frame-level trainer (seeds, BCE, checkpoint by val F1, history JSON) | Empty placeholder files (LSTM, Transformer, multilabel stubs) are replaced by the new modules |
 | `DrumCNN` conv + SE blocks as building blocks | `model_evaluator_runner.py` → `transcription_eval.py` around `mir_eval` | `cnn_mel_cqt_ensemble_classifier.py` (CQT does not suit a causal 10 ms frame rate) |
 | `single_label_metrics.py` for the baseline classifier only | `plotting_engine.py` → F1 per class, F1 vs latency, CPU vs F1 | `detect_bpm` from the real-time path (offline export only) |
@@ -186,13 +186,70 @@ Each step is its own commit.
 
 D3 (training on short windows) needs a new loader and a retrain, so it moves to stage 1b together with retraining the baseline.
 
+## Stage 1b: baseline redesign (agreed 2026-10-27)
+
+### Measurements that motivate it
+
+Measured on 2026-10-27 on the re-split data (inference only, no training).
+
+**The old CNN classifies by decay length, not by the attack.** The MEL CNN trained on the old split, given the full 2 s clip versus only the first part of it (what the converter feeds it):
+
+| Data | 2 s | 250 ms | 100 ms |
+|---|---|---|---|
+| Own kit (`cuttedValSets`, 140 hits) | acc 0.914 | acc 0.393, macro-F1 0.280 | acc 0.193 |
+| In-domain test (old model saw part of it) | acc 1.000 | acc 0.649 | acc 0.504 |
+
+At 250 ms the model never predicts crash, ride or floor tom; 88 of the 140 own-kit hits become hi-hat. The data explains why:
+
+- 98–100 % of crash, ride and floor tom files are longer than 2 s, and no kick or snare file is.
+- IDMT clips are 0.5 s followed by zero padding, and IDMT and the sample pack contain only kick, snare and hi-hat. Length and source therefore give the class away.
+
+**Data composition.**
+- All files are 44.1 kHz; half are stereo.
+- The sample library is 2,416 of the 2,721 files. Crash, ride, rack tom and floor tom come **only** from that one library kit. The in-domain test therefore measures generalization to other hits of the same kit; only the own-kit test measures generalization to another kit.
+- In 69 of the 140 own-kit clips, the attack of the next hit sits at the very end, because they were cut from onset to onset.
+
+**Old model.**
+- 1.82 M parameters, 94 % of them in `fc1`, because a 128×15×7 map is flattened.
+- `AdaptiveMaxPool(15, 7)` max-pools about 285 ms per cell, so the timing inside the attack is lost.
+- The first SE block has 2 hidden units.
+- Augmentation is computed once, so every epoch sees the same copies. Pitch shift (±2 semitones) blurs the main cue between rack and floor tom, which was the main confusion. Gain changes are undone by peak normalization.
+
+**Converter.**
+- Onset F1 on the test tracks (50 ms window): 0.95–1.00 on tracks 2 and 4–7, but 0.60 on track 1 (34 detected for 16 reference onsets).
+- Segments are 190–250 ms long, only because the tracks are sparse. Sixteenth notes at 120 BPM are 125 ms apart.
+
+### Design
+
+| Part | Old | New |
+|---|---|---|
+| Input | 2 s clip, zero padded | Window from 50 ms before to W ms after the onset. Past audio is free in real time; W is the latency the baseline pays. Default W = 100 ms; W ∈ {30, 50, 100, 200} ms gives the baseline's F1-versus-latency curve. The same function cuts the window in training, in the evaluator (own kit) and in the converter. |
+| Onset in a one-shot file | Assumed at sample 0 | First sample within 30 dB of the file's peak. |
+| Features | Mel, `n_fft=2048`, hop 256, 256 bands, dB relative to each file's maximum | Log-mel shared with the frame-level models (`src/data/features.py`): `n_fft=1024`, hop 220, 128 bands, 30 Hz–11.025 kHz, `center=False`, `log(1 + x)` on magnitude. Per-band mean and std are fitted on the training windows and stored in the model. |
+| Model | 4 convs, SE, 2 pools, `AdaptiveMaxPool(15, 7)`, FC 13,440→128→7 | 3 blocks (conv 3×3, BN, ReLU, twice; SE with at least 8 hidden units; max-pool over frequency only), with base, 2× base and 4× base channels (base 32). Then global average pooling over frequency and time, dropout and a linear layer. ~0.3 M parameters. Works for any W. |
+| Augmentation | 2 fixed copies: time shift, gain, noise, ±2 semitone pitch shift | Online, new for every sample and epoch: onset jitter ±10 ms; the decay of another random hit at −10 to −30 dB (dense playing); noise at 20–40 dB SNR; random low-pass or high-shelf EQ (microphones). No pitch shift. |
+| Training | Adam, batch 8, cosine with `T_max=10` | AdamW, batch 64 on MPS, linear warm-up then cosine decay, class-weighted loss, early stopping on val macro-F1, 3 seeds. |
+| Checkpoint | `state_dict` only | `state_dict` plus the window and feature settings, so the evaluator and the converter use exactly what the model was trained on. File names carry W (e.g. `best_cnn_w100ms.pth`). |
+| Evaluation | In-domain test and own-kit 2 s clips | In-domain test with per-source accuracy, plus the own kit cut with the same window. The own-kit result is the baseline's main number; then the stage 1 transcription harness. |
+
+Not fixed by this redesign: crash, ride and the toms still come from one kit. Only more kits (E-GMD, own recordings) fix that.
+
+**Implementation notes (2026-10-27).**
+- With the defaults, a window is 150 ms, i.e. 11 log-mel frames of 128 bands.
+- The CNN has 298,815 parameters.
+- One augmented pass over the 1,912 training hits takes 1.6 s in the main process and 10.8 s with 2 spawned DataLoader workers, so `NUM_WORKERS=0`. A forward pass of a 64-hit batch takes 14 ms on MPS.
+- D3 is fixed by this redesign. The converter no longer uses `onset_processor.py` (deleted), and the old 2 s spectrogram code is gone.
+- Old checkpoints cannot be loaded.
+
+Known limitation: in dense playing, a window can contain the attack of the next hit if it comes less than W after the onset. Training has no such case yet.
+
 ## Stages and done criteria
 
 | # | Stage | Done when |
 |---|---|---|
 | 0 | Clean up | Steps A–E of the stage 0 action plan above are done. |
 | 1 | Evaluation harness | `transcription_eval.py` scores the current pipeline on `TestTrack*` with `mir_eval`, as it is today. The first honest baseline number is recorded. |
-| 1b | Repaired baseline | The single-label code has the "Fix (baseline)" and "Fix (shared)" items done (D3, D5, B2–B5, B7–B12), is retrained on the cleaned split, and is scored by the same harness. Can run alongside stage 2. |
+| 1b | Repaired baseline | The single-label code has the "Fix (baseline)" and "Fix (shared)" items done (D3, D5, B2–B5, B7–B12), is retrained on the cleaned split, and is scored by the same harness. Can run alongside stage 2. Design implemented 2026-10-27 (see "Stage 1b: baseline redesign"); retraining (W ∈ {30, 50, 100, 200} ms × 3 seeds) is next. |
 | 2 | Data pipeline | E-GMD subset and IDMT loaders, class maps, cached features. One batch of `(features, targets)` can be plotted and looks right. |
 | 3 | First frame-level model | CRNN or causal CNN, 3 classes, trained on the E-GMD subset. F1 reported on E-GMD test, IDMT and own recordings. |
 | 4 | Model comparison | All models × 3 seeds × lookahead {0, 1, 2}. F1, latency, CPU and size tables, plus significance tests. Then extend to 5/7 classes. |

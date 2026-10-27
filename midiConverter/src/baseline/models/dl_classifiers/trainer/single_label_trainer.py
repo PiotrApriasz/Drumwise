@@ -8,9 +8,14 @@ import importlib
 
 from src import constants
 from src.constants import TRAINED_DL_MODELS_PATH, EVALUATION_RESULTS_PATH, SEED, EPOCHS, PATIENCE, BATCH_SIZE, \
-    NUM_WORKERS, AUGUMENT_FACTOR, CNN_LEARNING_RATE, CNN_WEIGHT_DECAY, CNN_LABEL_SMOOTHING
+    NUM_WORKERS, AUGMENT, CNN_LEARNING_RATE, CNN_WEIGHT_DECAY, CNN_LABEL_SMOOTHING, BASELINE_PRE_ONSET_MS, \
+    BASELINE_POST_ONSET_MS
+from src.baseline.data.dataset.augmentation import AugmentConfig
+from src.baseline.data.windowing import WindowConfig
 from src.baseline.evaluation.model_evaluator_runner import convert_numpy_types
+from src.baseline.models.dl_classifiers.classifiers.checkpoints import model_file_name
 from src.baseline.models.dl_classifiers.classifiers.cnn_classifier import build_cnn_optimization
+from src.data.features import LogMelConfig
 from src.reproducibility import set_seed
 
 
@@ -35,8 +40,8 @@ def get_classifier_class(model_type: str):
         raise RuntimeError(f"Error getting classifier class for {model_type}: {e}")
 
 
-def get_model_paths(model_type: str) -> tuple[str, str]:
-    """Constructs final and best model paths using constants."""
+def get_model_paths(model_type: str, post_onset_ms: int, seed: int) -> tuple[str, str]:
+    """Final and best model paths; the file names carry the window length and the seed."""
     model_type_upper = model_type.upper()
 
     final_model_const_name = f"{model_type_upper}_MODEL_NAME"
@@ -48,8 +53,8 @@ def get_model_paths(model_type: str) -> tuple[str, str]:
     except AttributeError as e:
         raise ValueError(f"Error: Model filename constants not found in constants.py for {model_type}. Missing constant: {e}")
 
-    final_path = os.path.join(TRAINED_DL_MODELS_PATH, final_model_filename)
-    best_path = os.path.join(TRAINED_DL_MODELS_PATH, best_model_filename)
+    final_path = os.path.join(TRAINED_DL_MODELS_PATH, model_file_name(final_model_filename, post_onset_ms, seed))
+    best_path = os.path.join(TRAINED_DL_MODELS_PATH, model_file_name(best_model_filename, post_onset_ms, seed))
 
     return final_path, best_path
 
@@ -68,7 +73,9 @@ def train_and_evaluate_model(args):
     patience = args.patience if args.patience is not None else PATIENCE
     batch_size = args.batch_size if args.batch_size is not None else BATCH_SIZE
     num_workers = args.num_workers if args.num_workers is not None else NUM_WORKERS
-    augment_factor = args.augment_factor if args.augment_factor is not None else AUGUMENT_FACTOR
+    augment = args.augment if args.augment is not None else AUGMENT
+    pre_onset_ms = args.pre_onset_ms if args.pre_onset_ms is not None else BASELINE_PRE_ONSET_MS
+    post_onset_ms = args.post_onset_ms if args.post_onset_ms is not None else BASELINE_POST_ONSET_MS
 
     # Model-specific hyperparameters
     if MODEL_TYPE == 'cnn':
@@ -79,24 +86,28 @@ def train_and_evaluate_model(args):
     set_seed(seed)
 
     try:
-        FINAL_MODEL_PATH, BEST_MODEL_PATH = get_model_paths(MODEL_TYPE)
+        FINAL_MODEL_PATH, BEST_MODEL_PATH = get_model_paths(MODEL_TYPE, post_onset_ms, seed)
     except ValueError as e:
         print(e)
         return
 
+    features = LogMelConfig()
+    window = WindowConfig(sr=features.sr, pre_s=pre_onset_ms / 1000, post_s=post_onset_ms / 1000)
+
     # --- Print Final Configuration ---
-    print(f"--- Final Configuration ---")
+    print("--- Final Configuration ---")
     print(f"Model Type: {MODEL_TYPE.upper()}")
+    print(f"Window: {pre_onset_ms} ms before to {post_onset_ms} ms after the onset")
     print(f"Seed: {seed}, Epochs: {epochs}, Patience: {patience}")
     print(f"Batch Size: {batch_size}, Num Workers: {num_workers}")
     print(f"LR: {lr}, Weight Decay: {weight_decay}, Label Smoothing: {label_smoothing}")
-    print(f"Augmentation Factor: {augment_factor}")
+    print(f"Online augmentation: {augment}")
     print(f"Best Model Path: {BEST_MODEL_PATH}")
     print(f"Final Model Path: {FINAL_MODEL_PATH}")
-    print(f"-------------------------")
+    print("-------------------------")
 
     # --- Initialization ---
-    print(f"\nInitializing {MODEL_TYPE.upper()} classifier with MEL features...")
+    print(f"\nInitializing {MODEL_TYPE.upper()} classifier with log-mel features...")
     try:
         ClassifierClass = get_classifier_class(MODEL_TYPE)
     except (ValueError, ImportError, RuntimeError) as e:
@@ -104,9 +115,13 @@ def train_and_evaluate_model(args):
         return
 
     classifier = ClassifierClass(
+        window=window,
+        features=features,
+        augment=AugmentConfig() if augment else None,
         batch_size=batch_size,
         num_workers=num_workers
     )
+    print(f"Trainable parameters: {sum(p.numel() for p in classifier.parameters() if p.requires_grad):,}")
 
     # --- Define Optimizer, Criterion, Scheduler ---
     if MODEL_TYPE == 'cnn':
@@ -122,8 +137,7 @@ def train_and_evaluate_model(args):
             criterion=criterion,
             scheduler=scheduler,
             epochs=epochs,
-            patience=patience,
-            augment_factor=augment_factor
+            patience=patience
         )
         print("Training complete.")
         print(f"Best validation macro-F1 achieved: {train_history['best_val_f1']:.4f}")
@@ -146,10 +160,7 @@ def train_and_evaluate_model(args):
             criterion=nn.CrossEntropyLoss(),  # unweighted, so test losses are comparable across runs
         )
         print("\nEvaluation complete.")
-        if 'test_acc' in eval_results:
-            print(f"Test Accuracy: {eval_results['test_acc']:.4f}")
-        else:
-            print("Evaluation finished, test accuracy key not found in results.")
+        print(f"Test Accuracy: {eval_results['test_acc']:.4f}")
     except Exception as e:
         print(f"\nError during evaluation: {e}")
         import traceback
@@ -158,12 +169,15 @@ def train_and_evaluate_model(args):
     # --- Saving Training History ---
     if 'train_history' in locals() and train_history:
         try:
-            training_history_filename = f"{MODEL_TYPE}_mel_training_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            training_history_filename = (f"{MODEL_TYPE}_mel_w{post_onset_ms}ms_s{seed}_training_history_"
+                                         f"{timestamp}.json")
             training_history_path = os.path.join(EVALUATION_RESULTS_PATH,
                                                  training_history_filename)
 
-            history_to_save = convert_numpy_types({**train_history, "seed": seed})
+            history_to_save = convert_numpy_types({**train_history, "seed": seed, "augment": augment})
 
+            os.makedirs(EVALUATION_RESULTS_PATH, exist_ok=True)
             with open(training_history_path, 'w') as f:
                 json.dump(history_to_save, f, indent=2)
             print(f"Training history saved to: {training_history_path}")
@@ -182,12 +196,14 @@ if __name__ == "__main__":
                         help="Type of model to train (e.g., 'cnn').")
 
     # Optional hyperparameters (default=None means use value from constants.py)
+    parser.add_argument('--post-onset-ms', type=int, default=None, help=f"Window length after the onset, the baseline's latency (default from constants: {BASELINE_POST_ONSET_MS}).")
+    parser.add_argument('--pre-onset-ms', type=int, default=None, help=f"Window length before the onset (default from constants: {BASELINE_PRE_ONSET_MS}).")
     parser.add_argument('--epochs', type=int, default=None, help=f"Max epochs (default from constants: {EPOCHS}).")
     parser.add_argument('--patience', type=int, default=None, help=f"Patience for early stopping (default from constants: {PATIENCE}).")
     parser.add_argument('--batch-size', type=int, default=None, help=f"Batch size (default from constants: {BATCH_SIZE}).")
     parser.add_argument('--lr', type=float, default=None, help="Learning rate (default from model-specific constants).")
     parser.add_argument('--weight-decay', type=float, default=None, help="Weight decay (default from model-specific constants).")
-    parser.add_argument('--augment-factor', type=int, default=None, help=f"Data augmentation factor (default from constants: {AUGUMENT_FACTOR}).")
+    parser.add_argument('--augment', action=argparse.BooleanOptionalAction, default=None, help=f"Online augmentation (default from constants: {AUGMENT}).")
     parser.add_argument('--label-smoothing', type=float, default=None, help="Label smoothing factor (default from model-specific constants).")
     parser.add_argument('--num-workers', type=int, default=None, help=f"Number of DataLoader workers (default from constants: {NUM_WORKERS}).")
     parser.add_argument('--seed', type=int, default=None, help=f"Random seed (default from constants: {SEED}).")

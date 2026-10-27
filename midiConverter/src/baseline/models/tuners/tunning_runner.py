@@ -5,18 +5,19 @@ import functools
 import traceback
 import importlib
 
-from src.constants import EPOCHS, PATIENCE, BATCH_SIZE, NUM_WORKERS, AUGUMENT_FACTOR, TRIAL_ARTIFACTS_PATH, SEED
+from src.constants import EPOCHS, PATIENCE, BATCH_SIZE, NUM_WORKERS, AUGMENT, TRIAL_ARTIFACTS_PATH, SEED, \
+    BASELINE_PRE_ONSET_MS, BASELINE_POST_ONSET_MS
 
 DEFAULT_TUNING_EPOCHS = EPOCHS // 3 if EPOCHS > 5 else 10
 DEFAULT_TUNING_PATIENCE = PATIENCE // 2 if PATIENCE > 2 else 3
 
-DEFAULT_LR_LOW = 1e-5
-DEFAULT_LR_HIGH = 1e-3
-DEFAULT_WD_LOW = 1e-6
-DEFAULT_WD_HIGH = 1e-4
+DEFAULT_LR_LOW = 1e-4
+DEFAULT_LR_HIGH = 3e-3
+DEFAULT_WD_LOW = 1e-4
+DEFAULT_WD_HIGH = 1e-1
 DEFAULT_LS_LOW = 0.0
-DEFAULT_LS_HIGH = 0.2
-DEFAULT_DROPOUT_LOW = 0.2
+DEFAULT_LS_HIGH = 0.15
+DEFAULT_DROPOUT_LOW = 0.1
 DEFAULT_DROPOUT_HIGH = 0.5
 
 def load_objective_function(model_type: str):
@@ -54,7 +55,9 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=DEFAULT_TUNING_PATIENCE, help=f"Patience per trial (default: {DEFAULT_TUNING_PATIENCE}).")
     parser.add_argument('--batch-size', type=int, default=BATCH_SIZE, help=f"Batch size for trials (default: {BATCH_SIZE}).")
     parser.add_argument('--num-workers', type=int, default=NUM_WORKERS, help=f"DataLoader workers (default: {NUM_WORKERS}).")
-    parser.add_argument('--augment-factor', type=int, default=AUGUMENT_FACTOR, help=f"Augmentation factor (default: {AUGUMENT_FACTOR}).")
+    parser.add_argument('--augment', action=argparse.BooleanOptionalAction, default=AUGMENT, help=f"Online augmentation (default: {AUGMENT}).")
+    parser.add_argument('--pre-onset-ms', type=int, default=BASELINE_PRE_ONSET_MS, help=f"Window before the onset (default: {BASELINE_PRE_ONSET_MS}).")
+    parser.add_argument('--post-onset-ms', type=int, default=BASELINE_POST_ONSET_MS, help=f"Window after the onset (default: {BASELINE_POST_ONSET_MS}).")
     parser.add_argument('--base-save-dir', type=str, default=TRIAL_ARTIFACTS_PATH, help="Base directory to save trial artifacts.")
     parser.add_argument('--seed', type=int, default=SEED, help=f"Random seed used for every trial (default: {SEED}).")
 
@@ -78,7 +81,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"--- Hyperparameter Tuning Run ---")
-    print(f"Model: {args.model_type.upper()}, Features: MEL")
+    print(f"Model: {args.model_type.upper()}, Features: log-mel, window {args.pre_onset_ms} ms before to {args.post_onset_ms} ms after the onset")
     print(f"Trials: {args.n_trials}, Epochs/Trial: {args.epochs}, Patience/Trial: {args.patience}")
     if args.study_name: print(f"Study Name: {args.study_name}")
     if args.storage: print(f"Storage: {args.storage}")
@@ -127,8 +130,8 @@ if __name__ == "__main__":
                  print(f"{const_name}={value:.4f}")
             elif key == 'dropout_rate':
                  print(f"{model_prefix}_DROPOUT_RATE={value:.4f}")
-            elif key.startswith('num_filters'):
-                 print(f"{model_prefix}_{key.upper()}={value}")
+            elif key == 'base_channels':
+                 print(f"{model_prefix}_BASE_CHANNELS={value}")
             else:
                  print(f"# Suggested {model_prefix} Param: {key.upper()}={value}")
         print("# -------------------------")

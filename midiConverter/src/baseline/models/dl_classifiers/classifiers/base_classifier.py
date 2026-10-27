@@ -7,56 +7,66 @@ from sklearn.metrics import confusion_matrix, f1_score
 import os
 import time
 
-from src.baseline.data.dataset.dataset_augumentation import create_augmented_dataset
-from src.baseline.data.feature_extraction.spectogram_generator import generate_mel_spectrogram
+from src.baseline.data.dataset.augmentation import AugmentConfig, augment_window, jitter_onset
+from src.baseline.data.dataset.single_label_dataset_loader import Hit, load_subset
+from src.baseline.data.windowing import WindowConfig, cut_window, peak_normalize
+from src.baseline.models.dl_classifiers.classifiers.checkpoints import load_checkpoint, save_checkpoint
 from src.constants import DRUM_INSTRUMENTS, INSTRUMENTS_DATA_SET_PATH
-from src.baseline.data.dataset.single_label_dataset_loader import load_subset
+from src.data.features import LogMelConfig, log_mel
 from src.reproducibility import get_device
 
 label_map = {inst: i for i, inst in enumerate(DRUM_INSTRUMENTS)}
 
 
-# --- Dataset Classes ---
+# --- Dataset ---
 
-class BaseDrumDataset(Dataset):
-    """Base dataset class for drum sounds."""
+def window_features(window: np.ndarray, features: LogMelConfig) -> torch.Tensor:
+    """Peak-normalizes one onset window and returns its ``(1, n_mels, frames)`` log-mel tensor."""
+    return torch.from_numpy(log_mel(peak_normalize(window), features)).unsqueeze(0)
 
-    def __init__(self, data, label_map, sr=22050):
-        self.data = data
-        self.sr = sr
+
+class WindowDataset(Dataset):
+    """Log-mel features of the window around each hit's onset, optionally augmented online."""
+
+    def __init__(self, hits: list[Hit], label_map, window: WindowConfig, features: LogMelConfig,
+                 augment: AugmentConfig = None):
+        if window.sr != features.sr:
+            raise ValueError(f"window sr {window.sr} != feature sr {features.sr}")
+        self.hits = hits
         self.label_map = label_map
-        if not data:
-            print("Warning: Initializing BaseDrumDataset with empty data.")
-        elif not isinstance(data[0], (tuple, list)) or len(data[0]) != 2:
-            print(
-                f"Warning: Data format might be incorrect. Expected list of (audio, label_str), got first element: {data[0]}")
+        self.window = window
+        self.features = features
+        self.augment = augment
+        self._rng_seed = None
+        self._rng_state = None
 
     def __len__(self):
-        return len(self.data)
+        return len(self.hits)
 
-    @abstractmethod
-    def __getitem__(self, idx):
-        pass
+    def _rng(self) -> np.random.Generator:
+        # One generator per process: DataLoader workers get different torch seeds, the main process uses the
+        # seed set by set_seed(), and the stream continues across epochs.
+        seed = torch.initial_seed() % 2 ** 32
+        if seed != self._rng_seed:
+            self._rng_seed, self._rng_state = seed, np.random.default_rng(seed)
+        return self._rng_state
 
-    def _get_base_item(self, idx):
-        """Helper to get audio and label."""
-        if idx >= len(self.data):
-            raise IndexError(f"Index {idx} out of bounds for dataset with length {len(self.data)}")
-        audio, label_str = self.data[idx]
-        if label_str not in self.label_map:
-            raise ValueError(f"Label '{label_str}' not found in label_map: {self.label_map.keys()}")
-        label = self.label_map[label_str]
-        return audio, label
-
-
-class MelDrumDataset(BaseDrumDataset):
-    """Dataset generating Mel spectrograms."""
+    def labels(self) -> list[int]:
+        return [self.label_map[hit.label] for hit in self.hits]
 
     def __getitem__(self, idx):
-        audio, label = self._get_base_item(idx)
-        mel_db = generate_mel_spectrogram(y=audio, sr=self.sr)
-        x = torch.tensor(mel_db, dtype=torch.float).unsqueeze(0)
-        y = torch.tensor(label, dtype=torch.long)
+        hit = self.hits[idx]
+        onset = hit.onset
+        if self.augment is not None:
+            rng = self._rng()
+            onset = jitter_onset(onset, self.window.sr, rng, self.augment.onset_jitter_s)
+            window = cut_window(hit.audio, onset, self.window)
+            other = self.hits[int(rng.integers(len(self.hits)))]
+            window = augment_window(window, self.window.sr, rng, self.augment, other=(other.audio, other.onset))
+        else:
+            window = cut_window(hit.audio, onset, self.window)
+        x = window_features(window, self.features)
+        y = torch.tensor(self.label_map[hit.label], dtype=torch.long)
         return x, y
 
 
@@ -72,6 +82,12 @@ def compute_class_weights(labels, num_classes):
     present = counts > 0
     weights[present] = counts.sum() / (present.sum() * counts[present])
     return torch.tensor(weights, dtype=torch.float)
+
+
+def band_statistics(dataset: WindowDataset) -> tuple[torch.Tensor, torch.Tensor]:
+    """Per-band mean and std of the (un-augmented) features of a dataset."""
+    features = torch.cat([dataset[i][0][0] for i in range(len(dataset))], dim=1)  # (n_mels, all frames)
+    return features.mean(dim=1), features.std(dim=1)
 
 
 class EarlyStopping:
@@ -99,10 +115,14 @@ class EarlyStopping:
 # --- Abstract Base Classifier ---
 
 class BaseClassifier(nn.Module, ABC):
-    def __init__(self, num_classes=len(DRUM_INSTRUMENTS), sr=22050, batch_size=8, num_workers=4):
+    def __init__(self, num_classes=len(DRUM_INSTRUMENTS), window: WindowConfig = WindowConfig(),
+                 features: LogMelConfig = LogMelConfig(), augment: AugmentConfig = AugmentConfig(),
+                 batch_size=64, num_workers=0):
         super().__init__()
         self.num_classes = num_classes
-        self.sr = sr
+        self.window = window
+        self.features = features
+        self.augment = augment
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.model = self._build_model()
@@ -115,36 +135,26 @@ class BaseClassifier(nn.Module, ABC):
         """Subclasses must implement this to define the model architecture."""
         pass
 
+    @abstractmethod
+    def model_config(self) -> dict:
+        """Constructor arguments of the model, stored in the checkpoint."""
+        pass
+
     def forward(self, x):
         """Forward pass delegates to the underlying model."""
         return self.model(x)
 
-    def _create_datasets(self, augment_factor=2):
-        """Loads raw data and creates train and validation datasets. The test split is never loaded here."""
-        train_data = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, "train"), DRUM_INSTRUMENTS, self.sr)
-        val_data = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, "val"), DRUM_INSTRUMENTS, self.sr)
-        if augment_factor > 0:
-            print(f"Creating augmented dataset with factor {augment_factor}...")
-            train_data_aug = create_augmented_dataset(train_data, sr=self.sr, augment_factor=augment_factor)
-        else:
-            train_data_aug = train_data
-            print("Skipping augmentation.")
-
-        train_dataset = MelDrumDataset(train_data_aug, self.label_map, sr=self.sr)
-        val_dataset = MelDrumDataset(val_data, self.label_map, sr=self.sr)
-
-        print(f"Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}")
-        return train_dataset, val_dataset
-
-    def _create_test_dataset(self):
-        """Loads only the test split (review item B11: no augmented training set is built for evaluation)."""
-        test_data = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, "test"), DRUM_INSTRUMENTS, self.sr)
-        return MelDrumDataset(test_data, self.label_map, sr=self.sr)
+    def _load_split(self, split, augment=None) -> WindowDataset:
+        hits = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, split), DRUM_INSTRUMENTS, self.window.sr)
+        return WindowDataset(hits, self.label_map, self.window, self.features, augment)
 
     def _create_loader(self, dataset, shuffle):
         # macOS starts workers with spawn, which pickles the in-memory dataset; persistent workers do it once
         return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle, num_workers=self.num_workers,
                           persistent_workers=self.num_workers > 0)
+
+    def save(self, path):
+        save_checkpoint(path, self.model, self.model_config(), self.window, self.features)
 
     def _train_epoch(self, train_loader, optimizer, criterion):
         """Runs a single training epoch."""
@@ -184,16 +194,24 @@ class BaseClassifier(nn.Module, ABC):
         return avg_loss, accuracy, all_labels, all_preds, all_outputs
 
     def train_model(self, save_path, best_model_save_path, optimizer, criterion, scheduler=None,
-                    epochs=50, patience=6, augment_factor=2, class_weighted=True):
+                    epochs=60, patience=10, class_weighted=True):
         """Full training loop with validation, early stopping on macro-F1, and model saving."""
+        print(f"Window: {self.window.pre_s * 1000:.0f} ms before to {self.window.post_s * 1000:.0f} ms after the onset; "
+              f"augmentation: {'on' if self.augment else 'off'}")
+        train_dataset = self._load_split("train", self.augment)
+        val_dataset = self._load_split("val")
+        print(f"Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}")
 
-        train_dataset, val_dataset = self._create_datasets(augment_factor=augment_factor)
+        # Input standardization is fitted on clean training windows and stored in the model's buffers.
+        clean_train = WindowDataset(train_dataset.hits, self.label_map, self.window, self.features)
+        mean, std = band_statistics(clean_train)
+        self.model.input_norm.set_stats(mean, std)
+
         train_loader = self._create_loader(train_dataset, shuffle=True)
         val_loader = self._create_loader(val_dataset, shuffle=False)
 
         if class_weighted and isinstance(criterion, nn.CrossEntropyLoss):
-            train_labels = [self.label_map[label] for _, label in train_dataset.data]
-            criterion.weight = compute_class_weights(train_labels, self.num_classes)
+            criterion.weight = compute_class_weights(train_dataset.labels(), self.num_classes)
             print(f"Class weights: {criterion.weight.numpy().round(3).tolist()}")
         criterion.to(self.device)
 
@@ -205,8 +223,10 @@ class BaseClassifier(nn.Module, ABC):
         val_accs = []
         val_f1s = []
         epoch_times = []
+        learning_rates = []
 
         for epoch in range(epochs):
+            learning_rates.append(optimizer.param_groups[0]["lr"])
             train_loss, epoch_duration = self._train_epoch(train_loader, optimizer, criterion)
             train_losses.append(train_loss)
             epoch_times.append(epoch_duration)
@@ -218,8 +238,9 @@ class BaseClassifier(nn.Module, ABC):
             val_f1s.append(val_f1)
 
             print(
-                f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, "
-                f"Val Acc: {val_acc:.4f}, Val Macro-F1: {val_f1:.4f}, Epoch Time: {epoch_duration:.2f}s")
+                f"Epoch {epoch + 1}/{epochs}, LR: {learning_rates[-1]:.2e}, Train Loss: {train_loss:.4f}, "
+                f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Val Macro-F1: {val_f1:.4f}, "
+                f"Epoch Time: {epoch_duration:.2f}s")
 
             if scheduler:
                 if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -229,8 +250,7 @@ class BaseClassifier(nn.Module, ABC):
 
             if early_stopping.step(val_f1):
                 best_val_acc = val_acc
-                os.makedirs(os.path.dirname(best_model_save_path), exist_ok=True)
-                torch.save(self.model.state_dict(), best_model_save_path)
+                self.save(best_model_save_path)
                 print(f"Saved best model (Val Macro-F1: {val_f1:.4f}) to {best_model_save_path}")
 
             print(f"Epochs without validation macro-F1 improvement: {early_stopping.epochs_no_improve}/{patience}")
@@ -240,8 +260,7 @@ class BaseClassifier(nn.Module, ABC):
 
         print(f"Training finished. Best validation macro-F1: {early_stopping.best:.4f}")
 
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        torch.save(self.model.state_dict(), save_path)
+        self.save(save_path)
         print(f"Saved final model state to {save_path}")
 
         return {
@@ -251,16 +270,23 @@ class BaseClassifier(nn.Module, ABC):
             "val_f1s": val_f1s,
             "best_val_f1": early_stopping.best,
             "best_val_acc": best_val_acc,
-            "epoch_times": epoch_times
+            "epoch_times": epoch_times,
+            "learning_rates": learning_rates,
+            "window": self.window.to_dict(),
+            "features": self.features.to_dict(),
+            "model_config": self.model_config(),
         }
 
     def evaluate_model(self, model_path, criterion):
-        """Loads a trained model and evaluates it on the test set."""
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        """Loads a trained model and evaluates it on the test set, using the window it was trained with."""
+        checkpoint = load_checkpoint(model_path, map_location=self.device)
+        self.model.load_state_dict(checkpoint["state_dict"])
+        self.window, self.features = checkpoint["window"], checkpoint["features"]
         self.model.eval()
         criterion.to(self.device)
 
-        test_loader = self._create_loader(self._create_test_dataset(), shuffle=False)
+        test_dataset = self._load_split("test")
+        test_loader = self._create_loader(test_dataset, shuffle=False)
         test_loss, test_acc, all_labels, all_preds, all_outputs = self._evaluate(test_loader, criterion)
 
         cm = confusion_matrix(all_labels, all_preds, labels=list(range(self.num_classes)))
@@ -276,10 +302,21 @@ class BaseClassifier(nn.Module, ABC):
             accuracy = class_correct / class_total if class_total > 0 else 0
             print(f"{instrument}: {accuracy:.4f} ({class_correct}/{class_total})")
 
+        # Crash, ride and the toms come from a single library kit, so accuracy per source shows kit dependence.
+        per_source = {}
+        for hit, label, pred in zip(test_dataset.hits, all_labels, all_preds):
+            correct, total = per_source.get(hit.source, (0, 0))
+            per_source[hit.source] = (correct + int(label == pred), total + 1)
+        per_source_accuracy = {src: correct / total for src, (correct, total) in sorted(per_source.items())}
+        print("\nPer-source accuracy:", {src: round(acc, 4) for src, acc in per_source_accuracy.items()})
+
         return {
             "test_loss": test_loss,
             "test_acc": test_acc,
             "labels": all_labels,
             "predictions": all_preds,
-            "outputs": all_outputs
+            "outputs": all_outputs,
+            "file_names": [hit.name for hit in test_dataset.hits],
+            "per_source_accuracy": per_source_accuracy,
+            "window": self.window.to_dict(),
         }

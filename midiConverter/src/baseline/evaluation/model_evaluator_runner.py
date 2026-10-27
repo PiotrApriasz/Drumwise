@@ -9,8 +9,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, EVALUATION_RESULTS_PATH
-from src.baseline.converters.conversion_utils import extract_true_label, classify_instrument_dl
+from src.constants import DRUM_INSTRUMENTS, TRAINED_DL_MODELS_PATH, CUTTED_VAL_SETS_PATH, EVALUATION_RESULTS_PATH, \
+    BASELINE_POST_ONSET_MS, SEED
+from src.baseline.converters.conversion_utils import extract_true_label, classify_hit_file
+from src.baseline.models.dl_classifiers.classifiers.checkpoints import model_file_name
+from src.baseline.models.dl_classifiers.classifiers.cnn_classifier import load_cnn
 from src.baseline.evaluation.metrics.single_label_metrics import get_all_single_label_metrics
 
 
@@ -35,31 +38,10 @@ def get_classifier_class(model_type: str):
         raise RuntimeError(f"Error getting classifier class for {model_type}: {e}")
 
 
-def get_model_implementation_class(model_type: str):
-    model_type = model_type.lower()
-
-    if model_type == 'cnn':
-        module_path = 'src.baseline.models.dl_classifiers.classifiers.cnn_classifier'
-        class_name = 'DrumCNN'
-    else:
-        raise ValueError(f"Unknown model type: {model_type}.")
-
-    try:
-        module = importlib.import_module(module_path)
-        model_class = getattr(module, class_name)
-        return model_class
-    except ModuleNotFoundError:
-        raise ImportError(f"Could not import module: {module_path}. Ensure the file exists.")
-    except AttributeError:
-        raise ImportError(f"Could not find class: {class_name} in module: {module_path}.")
-    except Exception as e:
-        raise RuntimeError(f"Error getting model class for {model_type}: {e}")
-
-
 FEATURE_TAG = "mel"  # the only feature type left; kept in result names so the comparison tools can parse them
 
 
-def get_model_paths(model_type: str):
+def get_model_paths(model_type: str, post_onset_ms: int, seed: int):
     best_model_const_name = f"BEST_{model_type.upper()}_MODEL_NAME"
 
     try:
@@ -68,16 +50,15 @@ def get_model_paths(model_type: str):
     except AttributeError:
         raise ValueError(f"Model filename constant not found in constants.py: {best_model_const_name}")
 
-    best_path = os.path.join(TRAINED_DL_MODELS_PATH, best_model_filename)
+    best_path = os.path.join(TRAINED_DL_MODELS_PATH, model_file_name(best_model_filename, post_onset_ms, seed))
 
     return best_path
 
 
-def perform_test_set_evaluation(model_type, criterion=None):
-    print(f"\n--- Starting Test Set Evaluation for {model_type.upper()} ---")
+def perform_test_set_evaluation(model_type, model_path, criterion=None):
+    print(f"\n--- Starting Test Set Evaluation for {model_type.upper()} ({model_path}) ---")
 
     try:
-        model_path = get_model_paths(model_type)
         if not model_path or not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found or path not applicable at: {model_path}")
 
@@ -119,25 +100,23 @@ def perform_test_set_evaluation(model_type, criterion=None):
         return None
 
 
-def evaluate_on_audio_files(model_type):
+def evaluate_on_audio_files(model_type, model_path):
+    """Own-kit hits, each cut with the same onset window as in training (the baseline's main number)."""
     print(f"Evaluating {model_type.upper()} model on audio files...")
 
     try:
-        model_path = get_model_paths(model_type)
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found at: {model_path}")
 
-        ModelClass = get_model_implementation_class(model_type)
-        model = ModelClass(num_classes=len(DRUM_INSTRUMENTS))
-        model.load_state_dict(torch.load(model_path, map_location="cpu"))
-        model.eval()
-        print(f"Loaded {model_type.upper()} model from {model_path} for audio file evaluation.")
+        model, window, features = load_cnn(model_path)
+        print(f"Loaded {model_type.upper()} model from {model_path} for audio file evaluation "
+              f"(window {window.pre_s * 1000:.0f} ms before to {window.post_s * 1000:.0f} ms after the onset).")
 
         y_true_audio = []
         y_pred_audio = []
 
         print(f"Processing audio files from: {CUTTED_VAL_SETS_PATH}")
-        audio_file_names = [f for f in os.listdir(CUTTED_VAL_SETS_PATH) if f.endswith(".wav")]
+        audio_file_names = sorted(f for f in os.listdir(CUTTED_VAL_SETS_PATH) if f.endswith(".wav"))
         if not audio_file_names:
             print("No .wav files found in CUTTED_VAL_SETS_PATH. Skipping audio file evaluation.")
             return None
@@ -148,7 +127,7 @@ def evaluate_on_audio_files(model_type):
                 continue
 
             audio_path = os.path.join(CUTTED_VAL_SETS_PATH, file_name)
-            predicted_label = classify_instrument_dl(audio_path, model)
+            predicted_label = classify_hit_file(audio_path, model, window, features)
 
             y_true_audio.append(true_label)
             y_pred_audio.append(predicted_label)
@@ -327,9 +306,10 @@ def run_all_evaluations(args):
     criterion = torch.nn.CrossEntropyLoss()
 
     model_type = args.model_type.lower()
+    model_path = get_model_paths(model_type, args.post_onset_ms, args.seed)
 
     print(f"\n--- Preparing for Test Set Evaluation ---")
-    test_results = perform_test_set_evaluation(model_type=model_type, criterion=criterion)
+    test_results = perform_test_set_evaluation(model_type=model_type, model_path=model_path, criterion=criterion)
 
     if test_results:
         all_results['test_set_evaluation'] = test_results
@@ -339,7 +319,7 @@ def run_all_evaluations(args):
         print(f"Test Set Evaluation FAILED or returned no results for {model_type}.")
 
     print(f"\n--- Preparing for Audio Files Evaluation ---")
-    audio_eval_results = evaluate_on_audio_files(model_type=model_type)
+    audio_eval_results = evaluate_on_audio_files(model_type=model_type, model_path=model_path)
 
     if audio_eval_results:
         all_results['audio_files_evaluation'] = audio_eval_results
@@ -352,7 +332,7 @@ def run_all_evaluations(args):
         json_path, results_dir = save_combined_results(
             overall_results_dict=all_results,
             model_type=model_type,
-            feature_type=FEATURE_TAG
+            feature_type=f"{FEATURE_TAG}_w{args.post_onset_ms}ms_s{args.seed}"
         )
         print(f"Results saved to: {results_dir}")
     elif not all_results:
@@ -368,6 +348,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--model-type', type=str, required=True, choices=['cnn'],
                         help="Type of model to evaluate.")
+    parser.add_argument('--post-onset-ms', type=int, default=BASELINE_POST_ONSET_MS,
+                        help=f"Window length W of the model to evaluate (default: {BASELINE_POST_ONSET_MS}).")
+    parser.add_argument('--seed', type=int, default=SEED, help=f"Seed of the model to evaluate (default: {SEED}).")
     parser.add_argument('--save-results', action='store_true',
                         help="Save all evaluation results (JSON and CM plots) to disk.")
 

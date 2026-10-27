@@ -2,8 +2,9 @@ import librosa
 import numpy as np
 import torch
 
-from src.constants import (DRUM_INSTRUMENTS)
-from src.baseline.data.feature_extraction.spectogram_generator import generate_mel_spectrogram
+from src.constants import DRUM_INSTRUMENTS
+from src.baseline.data.windowing import WindowConfig, cut_window, find_onset, peak_normalize
+from src.data.features import LogMelConfig, log_mel
 
 
 def extract_true_label(file_name: str) -> str:
@@ -23,14 +24,6 @@ def extract_true_label(file_name: str) -> str:
     elif "ride" in name_lower:
         return DRUM_INSTRUMENTS[6]
     return "unknown"
-
-
-def set_length(audio: np.ndarray, desired_length: int) -> np.ndarray:
-    if len(audio) > desired_length:
-        audio = audio[:desired_length]
-    else:
-        audio = np.pad(audio, (0, desired_length - len(audio)), mode='constant')
-    return audio
 
 
 def detect_bpm(audio, sr):
@@ -75,19 +68,16 @@ def detect_bpm(audio, sr):
     return int(estimated_bpm)
 
 
-def classify_audio_dl(y, model, sr=22050, duration=2):
-    """Classifies one hit given as a mono signal at `sr`, padded or trimmed to `duration` seconds."""
-    y = set_length(y, sr * duration)
-
-    features = generate_mel_spectrogram(y, sr=sr)
-    device = next(model.parameters()).device
-    x = torch.tensor(features, dtype=torch.float, device=device).unsqueeze(0).unsqueeze(0)
-
+def classify_window(window: np.ndarray, model, features: LogMelConfig) -> str:
+    """Classifies one onset window (cut with ``cut_window``), the same input the model was trained on."""
+    x = torch.from_numpy(log_mel(peak_normalize(window), features))[None, None]
     with torch.no_grad():
-        pred_idx = model(x).argmax(dim=1).item()
+        pred_idx = model(x.to(next(model.parameters()).device)).argmax(dim=1).item()
     return DRUM_INSTRUMENTS[pred_idx]
 
 
-def classify_instrument_dl(path, model, sr=22050, duration=2):
-    y, _ = librosa.load(path, sr=sr, mono=True)
-    return classify_audio_dl(y, model, sr=sr, duration=duration)
+def classify_hit_file(path, model, window: WindowConfig, features: LogMelConfig) -> str:
+    """Classifies a one-shot file: finds its onset and cuts the same window as in training."""
+    y, _ = librosa.load(path, sr=window.sr, mono=True)
+    y = peak_normalize(y)
+    return classify_window(cut_window(y, find_onset(y), window), model, features)
