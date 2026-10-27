@@ -168,11 +168,28 @@ Found in the review of 2026-10-27, by reading the code and checking the data. Li
 | B11 | `base_classifier.py:248` | `evaluate_model` rebuilds the whole augmented training set (with pitch shift) only to get the test set. | Fix (baseline). |
 | B12 | `dl_audio_to_midi_converter.py:19` | Every segment is written to a temporary WAV and read back before classification. | Fix (baseline). It matters for the latency benchmark. |
 
+## Stage 0 action plan (agreed 2026-10-27)
+
+Goal: start stage 1 from clean, working code. Code that the new pipeline drops is **deleted, not fixed**. Only code that stays gets fixed. The pre-fix pipeline stays reachable through a tag, so the "before" number can still be measured in stage 1 (e.g. from a `git worktree` of the tag).
+
+Each step is its own commit.
+
+| Step | Work | Done when |
+|---|---|---|
+| A | Tag `v0-single-label` on the state before any cleanup. | The tag exists. |
+| B1 | Delete dead code and generated junk: `src/depracated/`, the empty placeholder modules, `standard_audio_feature_extractor.py`, the MEL+CQT ensemble (B1), LSTM / Transformer / CNN-LSTM / scikit-learn entries in `.env`, `constants.py`, `run_script.py`, `script_running_constants.py` and the evaluator, `data/output/models/ml/`, `data/output/testingOnsets/`, `tempFiles/`. Trim `requirements.txt` (drop opencv, sphinx, torchvision, jupyter; add `mir_eval`; newer torch for MPS). | No reference to removed modules is left. |
+| B2 | Move the single-label code to `src/baseline/` (a move-only commit, so later diffs stay readable). | Imports and commands updated; nothing else changed. |
+| C | Native environment: `uv` venv with Python 3.12, install requirements, check imports and `torch.backends.mps`. | Every module imports; MPS is available. |
+| D | Data (D1, D2): remove the `cuttedValSets` copies from `training/`; re-split the remaining files by source recording (group key from the filename); add `check_leakage.py`. | `check_leakage.py` passes; split sizes are recorded. |
+| E | Fix the remaining "Fix (baseline)" and "Fix (shared)" items except D3 (B2–B12, D5, D6), with small pytest smoke tests for each fixed spot. | `pytest` passes. |
+
+D3 (training on short windows) needs a new loader and a retrain, so it moves to stage 1b together with retraining the baseline.
+
 ## Stages and done criteria
 
 | # | Stage | Done when |
 |---|---|---|
-| 0 | Clean up | Current state tagged. Duplicates and `cuttedValSets` copies removed from `training/` (D1, D2). `check_leakage.py` passes. Seeds in every entry point (D6). |
+| 0 | Clean up | Steps A–E of the stage 0 action plan above are done. |
 | 1 | Evaluation harness | `transcription_eval.py` scores the current pipeline on `TestTrack*` with `mir_eval`, as it is today. The first honest baseline number is recorded. |
 | 1b | Repaired baseline | The single-label code has the "Fix (baseline)" and "Fix (shared)" items done (D3, D5, B2–B5, B7–B12), is retrained on the cleaned split, and is scored by the same harness. Can run alongside stage 2. |
 | 2 | Data pipeline | E-GMD subset and IDMT loaders, class maps, cached features. One batch of `(features, targets)` can be plotted and looks right. |
