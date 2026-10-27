@@ -8,7 +8,7 @@ import os
 import time
 
 from src.baseline.data.dataset.dataset_augumentation import create_augmented_dataset
-from src.baseline.data.feature_extraction.spectogram_generator import generate_cqt_spectrogram, generate_mel_spectrogram
+from src.baseline.data.feature_extraction.spectogram_generator import generate_mel_spectrogram
 from src.constants import DRUM_INSTRUMENTS, INSTRUMENTS_DATA_SET_PATH
 from src.baseline.data.dataset.single_label_dataset_loader import load_subset
 from src.reproducibility import get_device
@@ -47,17 +47,6 @@ class BaseDrumDataset(Dataset):
             raise ValueError(f"Label '{label_str}' not found in label_map: {self.label_map.keys()}")
         label = self.label_map[label_str]
         return audio, label
-
-
-class CqtDrumDataset(BaseDrumDataset):
-    """Dataset generating CQT spectrograms."""
-
-    def __getitem__(self, idx):
-        audio, label = self._get_base_item(idx)
-        cqt_db = generate_cqt_spectrogram(y=audio, sr=self.sr)
-        x = torch.tensor(cqt_db, dtype=torch.float).unsqueeze(0)
-        y = torch.tensor(label, dtype=torch.long)
-        return x, y
 
 
 class MelDrumDataset(BaseDrumDataset):
@@ -110,20 +99,16 @@ class EarlyStopping:
 # --- Abstract Base Classifier ---
 
 class BaseClassifier(nn.Module, ABC):
-    def __init__(self, num_classes=len(DRUM_INSTRUMENTS), sr=22050, feature_type='cqt', batch_size=8, num_workers=4):
+    def __init__(self, num_classes=len(DRUM_INSTRUMENTS), sr=22050, batch_size=8, num_workers=4):
         super().__init__()
         self.num_classes = num_classes
         self.sr = sr
-        self.feature_type = feature_type.lower()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.model = self._build_model()
         self.label_map = label_map
         self.device = get_device()
         self.to(self.device)
-
-        if self.feature_type not in ['cqt', 'mel']:
-            raise ValueError("feature_type must be 'cqt' or 'mel'")
 
     @abstractmethod
     def _build_model(self) -> nn.Module:
@@ -133,15 +118,6 @@ class BaseClassifier(nn.Module, ABC):
     def forward(self, x):
         """Forward pass delegates to the underlying model."""
         return self.model(x)
-
-    def _get_dataset_class(self):
-        """Returns the appropriate Dataset class based on feature_type."""
-        if self.feature_type == 'cqt':
-            return CqtDrumDataset
-        elif self.feature_type == 'mel':
-            return MelDrumDataset
-        else:
-            raise ValueError("Invalid feature_type specified.")
 
     def _create_datasets(self, augment_factor=2):
         """Loads raw data and creates train and validation datasets. The test split is never loaded here."""
@@ -154,9 +130,8 @@ class BaseClassifier(nn.Module, ABC):
             train_data_aug = train_data
             print("Skipping augmentation.")
 
-        DatasetClass = self._get_dataset_class()
-        train_dataset = DatasetClass(train_data_aug, self.label_map, sr=self.sr)
-        val_dataset = DatasetClass(val_data, self.label_map, sr=self.sr)
+        train_dataset = MelDrumDataset(train_data_aug, self.label_map, sr=self.sr)
+        val_dataset = MelDrumDataset(val_data, self.label_map, sr=self.sr)
 
         print(f"Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}")
         return train_dataset, val_dataset
@@ -164,7 +139,7 @@ class BaseClassifier(nn.Module, ABC):
     def _create_test_dataset(self):
         """Loads only the test split (review item B11: no augmented training set is built for evaluation)."""
         test_data = load_subset(os.path.join(INSTRUMENTS_DATA_SET_PATH, "test"), DRUM_INSTRUMENTS, self.sr)
-        return self._get_dataset_class()(test_data, self.label_map, sr=self.sr)
+        return MelDrumDataset(test_data, self.label_map, sr=self.sr)
 
     def _create_loader(self, dataset, shuffle):
         # macOS starts workers with spawn, which pickles the in-memory dataset; persistent workers do it once

@@ -32,10 +32,8 @@ TESTING_ONSETS_PATH = _path("TESTING_ONSETS_PATH")
 
 EVALUATION_RESULTS_PATH = _path("EVALUATION_RESULTS_PATH")
 
-MEL_BEST_CNN_MODEL_NAME = os.getenv("MEL_BEST_CNN_MODEL_NAME")
-CQT_BEST_CNN_MODEL_NAME = os.getenv("CQT_BEST_CNN_MODEL_NAME")
-MEL_CNN_MODEL_NAME = os.getenv("MEL_CNN_MODEL_NAME")
-CQT_CNN_MODEL_NAME = os.getenv("CQT_CNN_MODEL_NAME")
+BEST_CNN_MODEL_NAME = os.getenv("BEST_CNN_MODEL_NAME", "mel_best_cnn_model.pth")
+CNN_MODEL_NAME = os.getenv("CNN_MODEL_NAME", "mel_cnn_model.pth")
 
 # Numeric settings are parsed here, once, so the rest of the code gets ints and floats.
 SEED = int(os.getenv("SEED", "42"))

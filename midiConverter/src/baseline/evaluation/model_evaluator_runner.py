@@ -56,11 +56,11 @@ def get_model_implementation_class(model_type: str):
         raise RuntimeError(f"Error getting model class for {model_type}: {e}")
 
 
-def get_model_paths(model_type: str, feature_type: str):
-    model_type_upper = model_type.upper()
-    feature_type_upper = feature_type.upper()
+FEATURE_TAG = "mel"  # the only feature type left; kept in result names so the comparison tools can parse them
 
-    best_model_const_name = f"{feature_type_upper}_BEST_{model_type_upper}_MODEL_NAME"
+
+def get_model_paths(model_type: str):
+    best_model_const_name = f"BEST_{model_type.upper()}_MODEL_NAME"
 
     try:
         from src import constants
@@ -73,16 +73,16 @@ def get_model_paths(model_type: str, feature_type: str):
     return best_path
 
 
-def perform_test_set_evaluation(model_type, feature_type, criterion=None):
-    print(f"\n--- Starting Test Set Evaluation for {model_type.upper()} with {feature_type.upper()} ---")
+def perform_test_set_evaluation(model_type, criterion=None):
+    print(f"\n--- Starting Test Set Evaluation for {model_type.upper()} ---")
 
     try:
-        model_path = get_model_paths(model_type, feature_type)
+        model_path = get_model_paths(model_type)
         if not model_path or not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found or path not applicable at: {model_path}")
 
         ClassifierClass = get_classifier_class(model_type)
-        classifier = ClassifierClass(feature_type=feature_type)
+        classifier = ClassifierClass()
         if criterion is None:
             criterion = torch.nn.CrossEntropyLoss()
 
@@ -113,17 +113,17 @@ def perform_test_set_evaluation(model_type, feature_type, criterion=None):
         return combined_test_metrics
 
     except Exception as e:
-        print(f"Error during test set evaluation for {model_type} ({feature_type}): {e}")
+        print(f"Error during test set evaluation for {model_type}: {e}")
         import traceback
         traceback.print_exc()
         return None
 
 
-def evaluate_on_audio_files(model_type, feature_type):
-    print(f"Evaluating {model_type.upper()} model with {feature_type.upper()} features on audio files...")
+def evaluate_on_audio_files(model_type):
+    print(f"Evaluating {model_type.upper()} model on audio files...")
 
     try:
-        model_path = get_model_paths(model_type, feature_type)
+        model_path = get_model_paths(model_type)
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found at: {model_path}")
 
@@ -148,11 +148,7 @@ def evaluate_on_audio_files(model_type, feature_type):
                 continue
 
             audio_path = os.path.join(CUTTED_VAL_SETS_PATH, file_name)
-            predicted_label = classify_instrument_dl(
-                audio_path,
-                model,
-                use_mel_model=(feature_type == 'mel')
-            )
+            predicted_label = classify_instrument_dl(audio_path, model)
 
             y_true_audio.append(true_label)
             y_pred_audio.append(predicted_label)
@@ -194,7 +190,7 @@ def evaluate_on_audio_files(model_type, feature_type):
         return audio_eval_results
 
     except Exception as e:
-        print(f"Error during audio file evaluation for {model_type} ({feature_type}): {e}")
+        print(f"Error during audio file evaluation for {model_type}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -331,14 +327,9 @@ def run_all_evaluations(args):
     criterion = torch.nn.CrossEntropyLoss()
 
     model_type = args.model_type.lower()
-    feature_type = args.feature_type.lower()
 
     print(f"\n--- Preparing for Test Set Evaluation ---")
-    test_results = perform_test_set_evaluation(
-        model_type=model_type,
-        feature_type=feature_type,
-        criterion=criterion
-    )
+    test_results = perform_test_set_evaluation(model_type=model_type, criterion=criterion)
 
     if test_results:
         all_results['test_set_evaluation'] = test_results
@@ -348,10 +339,7 @@ def run_all_evaluations(args):
         print(f"Test Set Evaluation FAILED or returned no results for {model_type}.")
 
     print(f"\n--- Preparing for Audio Files Evaluation ---")
-    audio_eval_results = evaluate_on_audio_files(
-        model_type=model_type,
-        feature_type=feature_type
-    )
+    audio_eval_results = evaluate_on_audio_files(model_type=model_type)
 
     if audio_eval_results:
         all_results['audio_files_evaluation'] = audio_eval_results
@@ -364,7 +352,7 @@ def run_all_evaluations(args):
         json_path, results_dir = save_combined_results(
             overall_results_dict=all_results,
             model_type=model_type,
-            feature_type=feature_type
+            feature_type=FEATURE_TAG
         )
         print(f"Results saved to: {results_dir}")
     elif not all_results:
@@ -380,8 +368,6 @@ if __name__ == "__main__":
 
     parser.add_argument('--model-type', type=str, required=True, choices=['cnn'],
                         help="Type of model to evaluate.")
-    parser.add_argument('--feature-type', type=str, required=True, choices=['cqt', 'mel'],
-                        help="Feature type the model was trained on.")
     parser.add_argument('--save-results', action='store_true',
                         help="Save all evaluation results (JSON and CM plots) to disk.")
 

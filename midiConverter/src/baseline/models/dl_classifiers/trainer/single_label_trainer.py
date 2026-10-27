@@ -35,19 +35,18 @@ def get_classifier_class(model_type: str):
         raise RuntimeError(f"Error getting classifier class for {model_type}: {e}")
 
 
-def get_model_paths(model_type: str, feature_type: str) -> tuple[str, str]:
+def get_model_paths(model_type: str) -> tuple[str, str]:
     """Constructs final and best model paths using constants."""
     model_type_upper = model_type.upper()
-    feature_type_upper = feature_type.upper()
 
-    final_model_const_name = f"{feature_type_upper}_{model_type_upper}_MODEL_NAME"
-    best_model_const_name = f"{feature_type_upper}_BEST_{model_type_upper}_MODEL_NAME"
+    final_model_const_name = f"{model_type_upper}_MODEL_NAME"
+    best_model_const_name = f"BEST_{model_type_upper}_MODEL_NAME"
 
     try:
         final_model_filename = getattr(constants, final_model_const_name)
         best_model_filename = getattr(constants, best_model_const_name)
     except AttributeError as e:
-        raise ValueError(f"Error: Model filename constants not found in constants.py for {model_type}/{feature_type}. Missing constant: {e}")
+        raise ValueError(f"Error: Model filename constants not found in constants.py for {model_type}. Missing constant: {e}")
 
     final_path = os.path.join(TRAINED_DL_MODELS_PATH, final_model_filename)
     best_path = os.path.join(TRAINED_DL_MODELS_PATH, best_model_filename)
@@ -61,7 +60,6 @@ def train_and_evaluate_model(args):
     using defaults from constants and allowing overrides from args.
     """
     MODEL_TYPE = args.model_type.lower()
-    FEATURE_TYPE = args.feature_type.lower()
 
     print("Loading configuration...")
 
@@ -81,7 +79,7 @@ def train_and_evaluate_model(args):
     set_seed(seed)
 
     try:
-        FINAL_MODEL_PATH, BEST_MODEL_PATH = get_model_paths(MODEL_TYPE, FEATURE_TYPE)
+        FINAL_MODEL_PATH, BEST_MODEL_PATH = get_model_paths(MODEL_TYPE)
     except ValueError as e:
         print(e)
         return
@@ -89,7 +87,6 @@ def train_and_evaluate_model(args):
     # --- Print Final Configuration ---
     print(f"--- Final Configuration ---")
     print(f"Model Type: {MODEL_TYPE.upper()}")
-    print(f"Feature Type: {FEATURE_TYPE.upper()}")
     print(f"Seed: {seed}, Epochs: {epochs}, Patience: {patience}")
     print(f"Batch Size: {batch_size}, Num Workers: {num_workers}")
     print(f"LR: {lr}, Weight Decay: {weight_decay}, Label Smoothing: {label_smoothing}")
@@ -99,7 +96,7 @@ def train_and_evaluate_model(args):
     print(f"-------------------------")
 
     # --- Initialization ---
-    print(f"\nInitializing {MODEL_TYPE.upper()} classifier with {FEATURE_TYPE.upper()} features...")
+    print(f"\nInitializing {MODEL_TYPE.upper()} classifier with MEL features...")
     try:
         ClassifierClass = get_classifier_class(MODEL_TYPE)
     except (ValueError, ImportError, RuntimeError) as e:
@@ -107,7 +104,6 @@ def train_and_evaluate_model(args):
         return
 
     classifier = ClassifierClass(
-        feature_type=FEATURE_TYPE,
         batch_size=batch_size,
         num_workers=num_workers
     )
@@ -162,7 +158,7 @@ def train_and_evaluate_model(args):
     # --- Saving Training History ---
     if 'train_history' in locals() and train_history:
         try:
-            training_history_filename = f"{MODEL_TYPE}_{FEATURE_TYPE}_training_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            training_history_filename = f"{MODEL_TYPE}_mel_training_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             training_history_path = os.path.join(EVALUATION_RESULTS_PATH,
                                                  training_history_filename)
 
@@ -184,8 +180,6 @@ if __name__ == "__main__":
     # Required arguments
     parser.add_argument('--model-type', type=str, required=True, choices=['cnn'],
                         help="Type of model to train (e.g., 'cnn').")
-    parser.add_argument('--feature-type', type=str, required=True, choices=['cqt', 'mel'],
-                        help="Type of input feature ('cqt' or 'mel').")
 
     # Optional hyperparameters (default=None means use value from constants.py)
     parser.add_argument('--epochs', type=int, default=None, help=f"Max epochs (default from constants: {EPOCHS}).")

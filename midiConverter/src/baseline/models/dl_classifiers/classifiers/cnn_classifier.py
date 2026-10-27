@@ -65,14 +65,14 @@ class DrumCNN(nn.Module):
 class DrumCNNClassifier(BaseClassifier):
     """CNN Classifier for Drum Sounds, using the BaseClassifier for training."""
 
-    def __init__(self, feature_type='cqt', sr=22050, batch_size=8, num_workers=4,
+    def __init__(self, sr=22050, batch_size=8, num_workers=4,
                  num_filters1=CNN_NUM_FILTERS1, num_filters2=CNN_NUM_FILTERS2, dropout_rate=CNN_DROPOUT_RATE):
         self.num_filters1 = num_filters1
         self.num_filters2 = num_filters2
         self.dropout_rate = dropout_rate
 
         super().__init__(num_classes=len(DRUM_INSTRUMENTS), sr=sr,
-                         feature_type=feature_type, batch_size=batch_size,
+                         batch_size=batch_size,
                          num_workers=num_workers)
 
     def _build_model(self) -> nn.Module:

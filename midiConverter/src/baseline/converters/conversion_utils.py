@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 from src.constants import (DRUM_INSTRUMENTS)
-from src.baseline.data.feature_extraction.spectogram_generator import generate_mel_spectrogram, generate_cqt_spectrogram
+from src.baseline.data.feature_extraction.spectogram_generator import generate_mel_spectrogram
 
 
 def extract_true_label(file_name: str) -> str:
@@ -75,14 +75,11 @@ def detect_bpm(audio, sr):
     return int(estimated_bpm)
 
 
-def classify_audio_dl(y, model, sr=22050, duration=2, use_mel_model=False):
+def classify_audio_dl(y, model, sr=22050, duration=2):
     """Classifies one hit given as a mono signal at `sr`, padded or trimmed to `duration` seconds."""
     y = set_length(y, sr * duration)
 
-    if use_mel_model:
-        features = generate_mel_spectrogram(y, sr=sr)
-    else:
-        features = generate_cqt_spectrogram(y, sr=sr)
+    features = generate_mel_spectrogram(y, sr=sr)
     device = next(model.parameters()).device
     x = torch.tensor(features, dtype=torch.float, device=device).unsqueeze(0).unsqueeze(0)
 
@@ -91,6 +88,6 @@ def classify_audio_dl(y, model, sr=22050, duration=2, use_mel_model=False):
     return DRUM_INSTRUMENTS[pred_idx]
 
 
-def classify_instrument_dl(path, model, sr=22050, duration=2, use_mel_model=False):
+def classify_instrument_dl(path, model, sr=22050, duration=2):
     y, _ = librosa.load(path, sr=sr, mono=True)
-    return classify_audio_dl(y, model, sr=sr, duration=duration, use_mel_model=use_mel_model)
+    return classify_audio_dl(y, model, sr=sr, duration=duration)

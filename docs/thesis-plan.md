@@ -12,6 +12,7 @@ Working notes on the thesis direction for `midiConverter/`. Sections are split b
 - **Task formulation:** frame-level multi-label onset detection. Details are in [frame-level-plan.md](frame-level-plan.md).
 - **Compute (2026-10-27):** everything runs natively on the Mac (M2 Pro, 16 GB), with training on the Apple GPU through PyTorch MPS. Docker is removed. If the Mac turns out too slow, a cloud GPU (Google or Azure) is considered.
 - **Classes (2026-10-27):** the main results use 3 classes (kick, snare, hi-hat), with explicit evaluation of simultaneous hits (hi-hat + snare, hi-hat + kick). Open hi-hat is the first extension.
+- **Features (2026-10-27):** mel only; CQT is dropped. With the settings used so far (librosa, fmin 32.7 Hz, 12 bins per octave, Q ≈ 16.8) the lowest CQT bin needs a window of about 11,300 samples at 22,050 Hz (~0.5 s), centred, so about 0.25 s of future audio. That rules it out for a 20–40 ms latency budget, and drums have no pitch for its log-frequency resolution to help with. The baseline uses the same log-mel input as the frame-level models, so the comparison isolates the task formulation and the architecture.
 - **Lookahead (2026-10-27):** the target use is recording MIDI while hearing the acoustic kit, so a constant delay can be compensated. Lookahead of 0–2 frames (0–20 ms) is an experimental variable, and the F1-versus-latency curve is a result.
 
 ## Proposed (to be confirmed)
@@ -72,7 +73,7 @@ A detailed proposal for moving to frame-level multi-label transcription (data, m
 What `midiConverter/` actually does today. Note that this differs in places from the plan above.
 
 - **Task:** single-label classification into 7 classes: `snare, crash, floor_tom, hi-hat, kick, rack_tom, ride` (order of `DRUM_INSTRUMENTS` in `src/constants.py`).
-- **Model:** a CNN with SE blocks (`DrumCNNClassifier`) on CQT or mel spectrograms. Hyperparameters were tuned with Optuna. A MEL+CQT ensemble averages the logits of the two best CNNs. The LSTM, Transformer and CNN-LSTM classifier files are empty.
+- **Model:** a CNN with SE blocks (`DrumCNNClassifier`) on mel spectrograms. Hyperparameters were tuned with Optuna. The CQT variant and the MEL+CQT ensemble were removed on 2026-10-27. The LSTM, Transformer and CNN-LSTM classifier files are empty.
 - **Results:** saved test-set accuracy is 0.92–1.0 depending on the run (`data/output/evaluation/`). These numbers are not trustworthy because of data leakage between splits (see [frame-level-plan.md](frame-level-plan.md)). The ~95.7% best validation accuracy from earlier notes is not recorded in the saved results.
 - **Data:** 2,721 one-shot WAV samples split into `train/val/test` folders per instrument (1912 / 422 / 387), padded or trimmed to 2 s. Since 2026-10-27 the split is by source recording, and the own-kit sets are test-only (`cuttedValSets`, plus 16 extra hi-hat hits in `data/input/ownKitExtra/`). The 96 former `training/snaretemp/` snare samples are part of the split (snare: 151 / 33 / 32). The **Groove MIDI Dataset is not integrated**.
 - **Conversion pipeline:** offline only. Librosa onset detection on a whole file is followed by classification of each ~0.15 s segment. The pipeline is neither causal nor streaming.

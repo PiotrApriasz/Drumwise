@@ -55,11 +55,10 @@ def test_velocity_is_in_midi_range_and_follows_loudness():  # B10
     assert estimate_velocity(np.zeros(100)) == 1
 
 
-@pytest.mark.parametrize("use_mel_model", [False, True])
-def test_classify_audio_dl_returns_an_instrument(use_mel_model):  # B2, B12
+def test_classify_audio_dl_returns_an_instrument():  # B12
     model = DrumCNN(num_classes=len(constants.DRUM_INSTRUMENTS)).eval()
     hit = np.random.default_rng(0).normal(0, 0.1, int(0.15 * SR)).astype(np.float32)
-    assert classify_audio_dl(hit, model, sr=SR, use_mel_model=use_mel_model) in constants.DRUM_INSTRUMENTS
+    assert classify_audio_dl(hit, model, sr=SR) in constants.DRUM_INSTRUMENTS
 
 
 def test_early_stopping_resets_on_improvement():  # B5

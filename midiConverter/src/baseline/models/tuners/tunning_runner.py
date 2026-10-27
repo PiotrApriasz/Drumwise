@@ -41,10 +41,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Optuna hyperparameter tuning for DL models.")
 
     # Required arguments
-    parser.add_argument('--model-type', type=str, required=True, choices=['cnn'], # Add 'lstm', etc. later
+    parser.add_argument('--model-type', type=str, required=True, choices=['cnn'],
                         help="Type of model to tune.")
-    parser.add_argument('--feature-type', type=str, required=True, choices=['cqt', 'mel'],
-                        help="Type of input feature.")
 
     # Tuning process arguments
     parser.add_argument('--n-trials', type=int, default=50, help="Number of Optuna trials.")
@@ -80,7 +78,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"--- Hyperparameter Tuning Run ---")
-    print(f"Model: {args.model_type.upper()}, Features: {args.feature_type.upper()}")
+    print(f"Model: {args.model_type.upper()}, Features: MEL")
     print(f"Trials: {args.n_trials}, Epochs/Trial: {args.epochs}, Patience/Trial: {args.patience}")
     if args.study_name: print(f"Study Name: {args.study_name}")
     if args.storage: print(f"Storage: {args.storage}")
@@ -94,11 +92,7 @@ if __name__ == "__main__":
     )
 
     # --- Prepare Objective with Fixed Arguments ---
-    objective_with_args = functools.partial(
-        objective_func,
-        feature_type=args.feature_type,
-        args=args
-    )
+    objective_with_args = functools.partial(objective_func, args=args)
 
     # --- Run Optimization ---
     try:

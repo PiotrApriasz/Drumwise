@@ -6,7 +6,7 @@ from src.baseline.models.dl_classifiers.classifiers.cnn_classifier import DrumCN
 from src.reproducibility import set_seed
 
 
-def objective_cnn(trial, feature_type, args) -> float:
+def objective_cnn(trial, args) -> float:
     """
     Optuna objective function specifically for the CNN model.
     """
@@ -27,7 +27,6 @@ def objective_cnn(trial, feature_type, args) -> float:
     # Every trial starts from the same seed, so trials differ only in their hyperparameters
     set_seed(args.seed)
     classifier = DrumCNNClassifier(
-        feature_type=feature_type,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         num_filters1=num_filters1,
@@ -39,9 +38,9 @@ def objective_cnn(trial, feature_type, args) -> float:
     optimizer, criterion, scheduler = build_cnn_optimization(classifier, lr, weight_decay, label_smoothing, args.epochs)
 
     # --- Training ---
-    trial_save_dir = os.path.join(args.base_save_dir, "tuning_trials", f"cnn_{feature_type}_trial_{trial.number}")
-    temp_best_path = os.path.join(trial_save_dir, f"cnn_{feature_type}_best.pth")
-    temp_final_path = os.path.join(trial_save_dir, f"cnn_{feature_type}_final.pth")
+    trial_save_dir = os.path.join(args.base_save_dir, "tuning_trials", f"cnn_trial_{trial.number}")
+    temp_best_path = os.path.join(trial_save_dir, "cnn_best.pth")
+    temp_final_path = os.path.join(trial_save_dir, "cnn_final.pth")
     os.makedirs(trial_save_dir, exist_ok=True)
 
     try:
